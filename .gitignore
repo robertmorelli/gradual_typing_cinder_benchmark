@@ -4,3 +4,4 @@ __pycache__
 .claude/
 .mypy_cache/
 cinder_docker_container
+*.diff

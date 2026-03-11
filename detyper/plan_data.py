@@ -4,73 +4,9 @@ import ast
 from ast import AST, FunctionDef, Call
 from typing import NamedTuple
 
+from .policy import resolve_annotation, classify_type
+
 TypeSpec = ast.expr  # alias for clarity
-
-# Primitive numeric types in Static Python / Cinder
-_PRIMITIVE_NAMES = frozenset({
-    'int64', 'int32', 'int16', 'int8',
-    'uint64', 'uint32', 'uint16', 'uint8',
-    'float64', 'float32',
-    'double', 'cbool',
-})
-
-# Container passthrough types (generic, treated with cast, but NOT CheckedList)
-_CONTAINER_NAMES = frozenset({
-    'Array', 'Vector',
-})
-
-# Generic types that cannot be cast at runtime (generators, iterators, etc.)
-# — strip the annotation but never emit a cast/wrap
-_UNCASTABLE_NAMES = frozenset({
-    'Iterator', 'Generator', 'Iterable', 'AsyncIterator', 'AsyncGenerator',
-    'AsyncIterable', 'Sequence', 'MutableSequence', 'Mapping', 'MutableMapping',
-    'Set', 'MutableSet', 'Callable', 'Awaitable', 'Coroutine',
-})
-
-# Python built-in types where cast() is not valid in Cinder — strip annotation only
-_BUILTIN_NAMES = frozenset({
-    'float', 'int', 'str', 'bool', 'bytes', 'list', 'dict', 'set', 'tuple', 'object', 'type',
-    'complex', 'bytearray', 'memoryview', 'range', 'slice', 'frozenset',
-})
-
-
-def resolve_annotation(typ: TypeSpec | None) -> TypeSpec | None:
-    """Resolve forward-reference string literals to Name nodes."""
-    if isinstance(typ, ast.Constant) and isinstance(typ.value, str):
-        return ast.Name(id=typ.value, ctx=ast.Load())
-    return typ
-
-
-def classify_type(typ: TypeSpec | None) -> str:
-    """Return one of: 'none', 'primitive', 'checked_list', 'container', 'cast'."""
-    if typ is None:
-        return 'none'
-    if isinstance(typ, ast.Constant) and typ.value is None:
-        return 'none'
-    if isinstance(typ, ast.Constant) and isinstance(typ.value, str):
-        return classify_type(ast.Name(id=typ.value, ctx=ast.Load()))  # forward ref
-    if isinstance(typ, ast.Name):
-        if typ.id == 'None':
-            return 'none'
-        if typ.id in _PRIMITIVE_NAMES:
-            return 'primitive'
-        if typ.id in _BUILTIN_NAMES:
-            return 'none'  # cast() not valid for Python builtins; strip annotation only
-        # User-defined class → cast
-        return 'cast'
-    if isinstance(typ, ast.Tuple):
-        return 'none'  # tuple annotations (e.g. (int, int)) not castable in Cinder
-    if isinstance(typ, ast.Subscript):
-        val = typ.value
-        if isinstance(val, ast.Name):
-            if val.id == 'CheckedList':
-                return 'checked_list'
-            if val.id in _CONTAINER_NAMES:
-                return 'container'
-            if val.id in _UNCASTABLE_NAMES:
-                return 'none'
-        return 'cast'
-    return 'cast'
 
 
 class FuncInfo(NamedTuple):

@@ -5,7 +5,8 @@ from ast import FunctionDef, Module, AST
 
 from .plan_data import PlanData, classify_type
 from .tasks import Arg, Strat, Detyper, RemoveAnnotation, ReproParam, AntiAlias, StripReturn, Wrap
-from .transforms import find_returns, find_ann_assigns, find_name_uses_after
+from .transforms import find_returns, find_ann_assigns
+from .policy import param_actions, body_actions, return_actions
 
 
 def _d(location: AST, context: AST, strat: Strat) -> Detyper:
@@ -45,13 +46,17 @@ def generate_tasks_params(
             continue  # unannotated param — no tasks
 
         kind = classify_type(typ)
+        actions = param_actions(kind)
 
-        if kind == 'none':
+        if 'remove_annotation' in actions:
             result.append(_d(node, node, Strat(RemoveAnnotation, [Arg(idx, typ)])))
+            continue
 
-        elif kind == 'checked_list':
-            # Keep param name; body gets `name = cast(T, name)`
+        if 'repro_param' in actions:
             result.append(_d(node, node, Strat(ReproParam, [Arg(idx, typ)])))
+
+        if 'anti_alias' in actions:
+            # Keep param name; body gets `name = cast(T, name)`
             for call, cf in free_call_sites:
                 result.append(_d(call, module, Strat(AntiAlias, [Arg(idx, typ)])))
             # method call sites: for bound calls (x.f(a)) arg idx = param_idx - 1;
@@ -61,15 +66,14 @@ def generate_tasks_params(
                 call_arg_idx = idx if len(call.args) == n_params else idx - 1
                 if call_arg_idx >= 0:
                     result.append(_d(call, module, Strat(AntiAlias, [Arg(call_arg_idx, typ)])))
+            continue
 
-        else:
-            # Rename to _name; body gets `name: T = wrap(T, _name)`
-            result.append(_d(node, node, Strat(ReproParam, [Arg(idx, typ)])))
+        if 'wrap_arg_primitive' in actions or 'wrap_arg_cast' in actions:
             # Target the arg node directly so wraps don't interfere with whole-call wraps
             for call, cf in free_call_sites:
                 if idx < len(call.args):
                     arg_node = call.args[idx]
-                    if kind == 'primitive':
+                    if 'wrap_arg_primitive' in actions:
                         result.append(_d(arg_node, cf, Strat(Wrap, [
                             Arg(None, typ, wrap_order=0),
                             Arg(None, None, wrap_order=1),
@@ -81,7 +85,7 @@ def generate_tasks_params(
                 call_arg_idx = idx if len(call.args) == n_params else idx - 1
                 if call_arg_idx >= 0 and call_arg_idx < len(call.args):
                     arg_node = call.args[call_arg_idx]
-                    if kind == 'primitive':
+                    if 'wrap_arg_primitive' in actions:
                         result.append(_d(arg_node, cf, Strat(Wrap, [
                             Arg(None, typ, wrap_order=0),
                             Arg(None, None, wrap_order=1),
@@ -108,14 +112,13 @@ def generate_tasks_body(
     for ann in find_ann_assigns(node):
         typ = ann.annotation
         kind = classify_type(typ)
+        actions = body_actions(kind)
 
-        if kind == 'none':
-            continue  # x: None = ... — keep unchanged
-
-        # Wrap the assignment value only. Subsequent uses are not wrapped because
-        # the annotation is preserved on the AnnAssign, giving Cinder the static type.
-        # Wrapping uses would lose type narrowing (e.g. Optional narrowed in if-blocks).
-        result.append(_d(ann, node, Strat(Wrap, [Arg(None, typ, wrap_order=0)])))
+        if 'wrap_ann_assign_value' in actions:
+            # Wrap the assignment value only. Subsequent uses are not wrapped because
+            # the annotation is preserved on the AnnAssign, giving Cinder the static type.
+            # Wrapping uses would lose type narrowing (e.g. Optional narrowed in if-blocks).
+            result.append(_d(ann, node, Strat(Wrap, [Arg(None, typ, wrap_order=0)])))
 
     return result
 
@@ -136,6 +139,7 @@ def generate_tasks_return(
     info = plan.funcs[name]
     ret_typ = info.return_type
     kind = classify_type(ret_typ)
+    actions = return_actions(kind)
     result: list[Detyper] = []
 
     free_calls = [
@@ -148,39 +152,38 @@ def generate_tasks_return(
     ]
     all_calls = free_calls + method_calls
 
-    if kind == 'none':
+    if 'remove_return_annotation' in actions:
         result.append(_d(node, node, Strat(RemoveAnnotation, [Arg(None, None)])))
-        return result
-
-    # Strip return annotation for all non-None return types
-    result.append(_d(node, node, Strat(RemoveAnnotation, [Arg(None, None)])))
 
     return_nodes = find_returns(node)
 
-    if kind == 'checked_list':
-        # Internal: strip CheckedList[T](...) constructor from return value
+    if 'strip_internal_checked_list' in actions:
+        # Internal: strip CheckedList[T](...) constructor from return value.
         for ret in return_nodes:
             if ret.value is not None:
                 result.append(_d(ret, node, Strat(StripReturn, [Arg(None, ret_typ)])))
-        # External: wrap call site with CheckedList[T](call)
-        for call, cf in all_calls:
-            result.append(_d(call, cf, Strat(Wrap, [Arg(None, ret_typ, wrap_order=0)])))
 
-    elif kind == 'primitive':
-        # Internal: box(T(return_value))
+    if 'wrap_internal_primitive_box' in actions:
+        # Internal: box(T(return_value)).
         for ret in return_nodes:
             if ret.value is not None:
                 result.append(_d(ret, node, Strat(Wrap, [
                     Arg(None, ret_typ, wrap_order=0),  # T(...)
                     Arg(None, None, wrap_order=1),     # box(...)
                 ])))
-        # External: T(call)
+
+    if 'wrap_call_checked_list' in actions:
+        # External: CheckedList[T](call).
         for call, cf in all_calls:
             result.append(_d(call, cf, Strat(Wrap, [Arg(None, ret_typ, wrap_order=0)])))
 
-    else:  # cast / container
-        # Internal: no wrap on return value
-        # External: cast(T, call)
+    if 'wrap_call_primitive' in actions:
+        # External: T(call).
+        for call, cf in all_calls:
+            result.append(_d(call, cf, Strat(Wrap, [Arg(None, ret_typ, wrap_order=0)])))
+
+    if 'wrap_call_cast' in actions:
+        # External: cast(T, call).
         for call, cf in all_calls:
             result.append(_d(call, cf, Strat(Wrap, [Arg(None, ret_typ, wrap_order=0)])))
 
