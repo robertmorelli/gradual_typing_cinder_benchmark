@@ -1,6 +1,7 @@
 """Per-permutation pipeline."""
 
 import ast
+import json
 import subprocess
 import sys
 from ast import Module
@@ -142,13 +143,7 @@ def run_permutation(
         capture_output=True, text=True,
     )
 
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"permutation {perm_hex} failed (exit {proc.returncode}):\n"
-            f"{proc.stderr or proc.stdout}"
-        )
-
-    return {
+    result = {
         'perm': perm,
         'perm_hex': perm_hex,
         'file': str(out_file),
@@ -156,3 +151,13 @@ def run_permutation(
         'stdout': proc.stdout,
         'stderr': proc.stderr,
     }
+    result_file = out_file.with_name(f"run_result_{perm_hex}.json")
+    result_file.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"permutation {perm_hex} failed (exit {proc.returncode}):\n"
+            f"{proc.stderr or proc.stdout}"
+        )
+
+    return result
