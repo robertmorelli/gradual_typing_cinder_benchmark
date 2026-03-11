@@ -1,0 +1,6 @@
+[submodule "cinder_env"]
+	path = cinder_env
+	url = https://github.com/robertmorelli/cinder_env
+[submodule "static-python-perf"]
+	path = static-python-perf
+	url = https://github.com/utahplt/static-python-perf

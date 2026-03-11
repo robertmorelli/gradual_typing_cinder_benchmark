@@ -1,0 +1,5 @@
+detyped_files/*
+__pycache__
+*.pyc
+.claude/
+.mypy_cache/
