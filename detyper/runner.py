@@ -144,15 +144,24 @@ def _apply_anti_alias(node: AST, context: AST, args: list[Arg], module: Module) 
         s.name for s in mod_body if isinstance(s, FunctionDef)
     }
 
-    # Determine current callee name
-    callee_name = node.func.id if isinstance(node.func, ast.Name) else 'unknown'
-    current_f = callee_name
+    # Determine callee name (for repro wrapper naming) and save callee expression
+    if isinstance(node.func, ast.Name):
+        callee_name = node.func.id
+    elif isinstance(node.func, ast.Attribute):
+        callee_name = node.func.attr
+    else:
+        callee_name = 'unknown'
+
+    # current_callee_expr: the expression to pass as 'f' to the first wrapper.
+    # After the first rewrite node.func changes, so we capture it upfront.
+    current_callee_expr: ast.expr = node.func  # will be replaced by Name after first iteration
+    current_f_name: str = callee_name           # for naming subsequent wrappers
 
     for arg in sorted(args, key=lambda a: a.index if a.index is not None else -1):
         idx = arg.index
         typ = arg.typ
 
-        base = f'_repro_{current_f}_arg{idx}'
+        base = f'_repro_{current_f_name}_arg{idx}'
         repro_name = base
         n = 2
         while repro_name in existing:
@@ -206,11 +215,13 @@ def _apply_anti_alias(node: AST, context: AST, args: list[Arg], module: Module) 
         mod_body.insert(insert_idx, wrapper)
         insert_idx += 1
 
-        # Rewrite call site: repro_name(current_f, arg0, arg1, ...)
+        # Rewrite call site: repro_name(callee_expr, arg0, arg1, ...)
         saved_args = list(node.args)
         node.func = ast.Name(id=repro_name, ctx=ast.Load())
-        node.args = [ast.Name(id=current_f, ctx=ast.Load())] + saved_args
-        current_f = repro_name
+        node.args = [current_callee_expr] + saved_args
+        # Next iteration: callee is the repro wrapper itself
+        current_callee_expr = ast.Name(id=repro_name, ctx=ast.Load())
+        current_f_name = repro_name
 
 
 def _apply_strip_return(node: AST) -> None:
@@ -223,17 +234,19 @@ def _apply_strip_return(node: AST) -> None:
 
 
 def _apply_wrap(node: AST, context: AST, args: list[Arg]) -> None:
-    # Sort: indexed args first (within same wrap_order), then whole-call args.
-    # Secondary key ensures arg-specific wraps happen before whole-call wraps.
-    sorted_args = sorted(args, key=lambda a: (a.wrap_order, 1 if a.index is None else 0))
+    # Sort: ALL indexed arg wraps before ALL whole-call wraps, then by wrap_order within each group.
+    sorted_args = sorted(args, key=lambda a: (1 if a.index is None else 0, a.wrap_order))
 
     if isinstance(node, ast.AnnAssign):
         # index is always None here (whole-value wrap)
+        # Keep the annotation so Cinder retains the static type for the variable.
+        # This is critical for primitive types used in loop counters: without the
+        # annotation, Cinder cannot promote literals in arithmetic (e.g. int64 + 1)
+        # and produces Union[dynamic, int64] across loop iterations.
         if node.value is not None:
             for arg in sorted_args:
                 node.value = make_box_expr(node.value) if arg.typ is None \
                     else make_wrap_expr(node.value, arg.typ)
-        node.annotation = None  # sentinel for _post_process
 
     elif isinstance(node, ast.Return):
         # index is always None here
@@ -265,9 +278,17 @@ def _apply_wrap(node: AST, context: AST, args: list[Arg]) -> None:
                     node.args = outer.args
                     node.keywords = outer.keywords
 
-    elif isinstance(node, ast.Name):
-        # Subsequent variable use — replace in parent (context) via NodeReplacer
-        expr: ast.expr = ast.Name(id=node.id, ctx=ast.Load())
+    elif isinstance(node, ast.expr):
+        # Any expression (ast.Name, ast.Attribute, ast.Constant, etc.) —
+        # build wrap around the original node, then replace it in context.
+        # For ast.Name we create a fresh Name so the original is abandoned;
+        # for all other exprs we wrap the original directly (safe because
+        # _SpecificNodeReplacer never recurses into its replacement).
+        if isinstance(node, ast.Name):
+            inner: ast.expr = ast.Name(id=node.id, ctx=ast.Load())
+        else:
+            inner = node
+        expr: ast.expr = inner
         for arg in sorted_args:
             expr = make_box_expr(expr) if arg.typ is None \
                 else make_wrap_expr(expr, arg.typ)
@@ -421,8 +442,9 @@ def run_permutation(
     out_file = output_dir / f"{source_stem}_{perm_hex}.py"
     out_file.write_text(ast.unparse(tree), encoding='utf-8')
 
+    cinder = Path(__file__).parent.parent / 'cinder_env' / 'bin' / 'python'
     proc = subprocess.run(
-        [sys.executable, str(out_file)],
+        [str(cinder), str(out_file)],
         capture_output=True, text=True,
     )
 

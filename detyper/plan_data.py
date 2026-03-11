@@ -19,6 +19,12 @@ _CONTAINER_NAMES = frozenset({
     'Array', 'Vector',
 })
 
+# Python built-in types where cast() is not valid in Cinder — strip annotation only
+_BUILTIN_NAMES = frozenset({
+    'float', 'int', 'str', 'bool', 'bytes', 'list', 'dict', 'set', 'tuple', 'object', 'type',
+    'complex', 'bytearray', 'memoryview', 'range', 'slice', 'frozenset',
+})
+
 
 def classify_type(typ: TypeSpec | None) -> str:
     """Return one of: 'none', 'primitive', 'checked_list', 'container', 'cast'."""
@@ -31,8 +37,12 @@ def classify_type(typ: TypeSpec | None) -> str:
             return 'none'
         if typ.id in _PRIMITIVE_NAMES:
             return 'primitive'
-        # Regular class name or builtin like 'int', 'str' → cast
+        if typ.id in _BUILTIN_NAMES:
+            return 'none'  # cast() not valid for Python builtins; strip annotation only
+        # User-defined class → cast
         return 'cast'
+    if isinstance(typ, ast.Tuple):
+        return 'none'  # tuple annotations (e.g. (int, int)) not castable in Cinder
     if isinstance(typ, ast.Subscript):
         val = typ.value
         if isinstance(val, ast.Name):
@@ -67,7 +77,6 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
     On arity or annotation conflict (e.g. same method name in different classes),
     the function is marked is_detyped=False (skip detyping rather than crash).
     """
-    import sys
     grouped: dict[str, list] = {}
     for fdef in defs:
         name = fdef.name
@@ -84,17 +93,13 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
             for a in base_params
         ]
         return_type: TypeSpec | None = base.returns
-        conflict = False
 
         for fdef in fdefs[1:]:
             fargs = fdef.args.args
             if len(fargs) != n:
-                print(
-                    f"[detyper] arity conflict for '{name}' ({n} vs {len(fargs)} params)"
-                    " — skipping detyping",
-                    file=sys.stderr,
-                )
-                conflict = True
+                # Arity mismatch — clear all param types; call-site wrapping is unsafe
+                param_types = [None] * n
+                return_type = None
                 break
             for i, (merged, new_arg) in enumerate(zip(param_types, fargs)):
                 new_ann = new_arg.annotation if new_arg.annotation else None
@@ -102,29 +107,21 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
                     param_types[i] = new_ann
                 elif new_ann is not None:
                     if not _annotations_equal(merged, new_ann):
-                        print(
-                            f"[detyper] annotation conflict for '{name}' param {i}"
-                            " — skipping detyping",
-                            file=sys.stderr,
-                        )
-                        conflict = True
-                        break
-            if conflict:
-                break
+                        param_types[i] = None  # conflicting — strip annotation, skip wrapping
             new_ret = fdef.returns
             if return_type is None:
                 return_type = new_ret
             elif new_ret is not None:
                 if not _annotations_equal(return_type, new_ret):
-                    print(
-                        f"[detyper] return annotation conflict for '{name}'"
-                        " — skipping detyping",
-                        file=sys.stderr,
-                    )
-                    conflict = True
-                    break
+                    return_type = None  # conflicting — strip annotation, skip wrapping
 
-        is_detyped = (not conflict) and guide.get(name, False)
+        has_inline = any(
+            (isinstance(d, ast.Name) and d.id == 'inline') or
+            (isinstance(d, ast.Attribute) and d.attr == 'inline')
+            for fdef in fdefs
+            for d in fdef.decorator_list
+        )
+        is_detyped = (not has_inline) and guide.get(name, False)
         funcs[name] = FuncInfo(
             fun_name=name,
             param_types=param_types,

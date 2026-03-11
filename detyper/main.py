@@ -31,13 +31,14 @@ def _parse_stdout_time(stdout: str) -> float | None:
 
 def main():
     parser = argparse.ArgumentParser(description='Detyper for Static Python benchmarks')
-    parser.add_argument('benchmark_file', help='Path to .py benchmark file')
+    parser.add_argument('benchmark_file',
+                        help='Path to .py benchmark file, or a benchmark name (e.g. richards)')
     parser.add_argument('--show-perm', metavar='HEX',
                         help='Print transformed source for a specific permutation and exit')
     parser.add_argument('--test', action='store_true',
                         help='Run fully typed and fully detyped once')
     parser.add_argument('--by-proportion', action='store_true',
-                        help='Run 0%, n intermediate proportions, and 100%% detyped')
+                        help='Run 0%%, n intermediate proportions, and 100%% detyped')
     parser.add_argument('--proportions', type=int, default=5, metavar='N',
                         help='Number of intermediate proportions (default: 5)')
     parser.add_argument('--iterations', type=int, default=3, metavar='K',
@@ -45,14 +46,22 @@ def main():
     args = parser.parse_args()
 
     src_path = Path(args.benchmark_file)
-    if not src_path.exists():
+    # Allow bare benchmark name like "richards" as shorthand
+    if not src_path.exists() and '/' not in args.benchmark_file:
+        candidate = Path('static-python-perf/Benchmark') / args.benchmark_file / 'advanced' / 'main.py'
+        if candidate.exists():
+            src_path = candidate
+        else:
+            print(f"Error: file not found: {src_path}", file=sys.stderr)
+            sys.exit(1)
+    elif not src_path.exists():
         print(f"Error: file not found: {src_path}", file=sys.stderr)
         sys.exit(1)
 
     source = src_path.read_text(encoding='utf-8')
     tree = ast.parse(source)
     defs = all_function_defs(tree)
-    fun_names = sorted({f.name for f in defs})
+    fun_names = sorted({f.name for f in defs if not (f.name.startswith('__') and f.name.endswith('__'))})
     n = len(fun_names)
 
     try:
@@ -139,8 +148,8 @@ def main():
             print(f"{0.0:>12.2f}  {0:>7}  {'—':>7}  {'failed':>10}")
 
         # N intermediate proportions, K samples each
-        for i in range(1, N + 1):
-            k_detyped = max(1, min(n - 1, round(i * n / (N + 1))))
+        for i in range(1, N):
+            k_detyped = max(1, min(n - 1, round(i * n / N)))
             run_proportion(k_detyped, K)
 
         # 100% — fully detyped, single run

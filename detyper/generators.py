@@ -31,9 +31,13 @@ def generate_tasks_params(
     result: list[Detyper] = []
 
     # Call sites: (call_node, caller_funcdef)
-    call_sites = [
+    free_call_sites = [
         (call, cf) for call, cf in func_uses
         if isinstance(call.func, ast.Name) and call.func.id == name
+    ]
+    method_call_sites = [
+        (call, cf) for call, cf in method_uses
+        if isinstance(call.func, ast.Attribute) and call.func.attr == name
     ]
 
     for idx, typ in enumerate(info.param_types):
@@ -48,24 +52,42 @@ def generate_tasks_params(
         elif kind == 'checked_list':
             # Keep param name; body gets `name = cast(T, name)`
             result.append(_d(node, node, Strat(ReproParam, [Arg(idx, typ)])))
-            for call, cf in call_sites:
+            for call, cf in free_call_sites:
                 result.append(_d(call, module, Strat(AntiAlias, [Arg(idx, typ)])))
+            # method call sites: for bound calls (x.f(a)) arg idx = param_idx - 1;
+            # for unbound calls (C.f(self, a)) arg idx = param_idx (self is in call.args)
+            for call, cf in method_call_sites:
+                n_params = len(info.param_types)
+                call_arg_idx = idx if len(call.args) == n_params else idx - 1
+                if call_arg_idx >= 0:
+                    result.append(_d(call, module, Strat(AntiAlias, [Arg(call_arg_idx, typ)])))
 
         else:
             # Rename to _name; body gets `name: T = wrap(T, _name)`
             result.append(_d(node, node, Strat(ReproParam, [Arg(idx, typ)])))
-            # Wrap arg[idx] at each call site
-            for call, cf in call_sites:
+            # Target the arg node directly so wraps don't interfere with whole-call wraps
+            for call, cf in free_call_sites:
                 if idx < len(call.args):
+                    arg_node = call.args[idx]
                     if kind == 'primitive':
-                        # box(T(arg)) — T inner (order=0), box outer (order=1)
-                        result.append(_d(call, cf, Strat(Wrap, [
-                            Arg(idx, typ, wrap_order=0),
-                            Arg(idx, None, wrap_order=1),  # None = box
+                        result.append(_d(arg_node, cf, Strat(Wrap, [
+                            Arg(None, typ, wrap_order=0),
+                            Arg(None, None, wrap_order=1),
                         ])))
                     else:
-                        # cast(T, arg)
-                        result.append(_d(call, cf, Strat(Wrap, [Arg(idx, typ, wrap_order=0)])))
+                        result.append(_d(arg_node, cf, Strat(Wrap, [Arg(None, typ, wrap_order=0)])))
+            for call, cf in method_call_sites:
+                n_params = len(info.param_types)
+                call_arg_idx = idx if len(call.args) == n_params else idx - 1
+                if call_arg_idx >= 0 and call_arg_idx < len(call.args):
+                    arg_node = call.args[call_arg_idx]
+                    if kind == 'primitive':
+                        result.append(_d(arg_node, cf, Strat(Wrap, [
+                            Arg(None, typ, wrap_order=0),
+                            Arg(None, None, wrap_order=1),
+                        ])))
+                    else:
+                        result.append(_d(arg_node, cf, Strat(Wrap, [Arg(None, typ, wrap_order=0)])))
 
     return result
 
@@ -90,17 +112,10 @@ def generate_tasks_body(
         if kind == 'none':
             continue  # x: None = ... — keep unchanged
 
-        # Wrap the assignment value (index=None = whole node)
+        # Wrap the assignment value only. Subsequent uses are not wrapped because
+        # the annotation is preserved on the AnnAssign, giving Cinder the static type.
+        # Wrapping uses would lose type narrowing (e.g. Optional narrowed in if-blocks).
         result.append(_d(ann, node, Strat(Wrap, [Arg(None, typ, wrap_order=0)])))
-
-        # Wrap subsequent Name uses for non-CheckedList types
-        if kind in ('primitive', 'cast', 'container'):
-            var_name = ann.target.id if isinstance(ann.target, ast.Name) else None
-            if var_name:
-                for name_node in find_name_uses_after(node, var_name, ann):
-                    result.append(_d(name_node, node, Strat(Wrap, [
-                        Arg(None, typ, wrap_order=0)
-                    ])))
 
     return result
 
