@@ -144,7 +144,7 @@ def _apply_anti_alias(node: AST, context: AST, args: list[Arg], module: Module) 
         s.name for s in mod_body if isinstance(s, FunctionDef)
     }
 
-    # Determine callee name (for repro wrapper naming) and save callee expression
+    # Determine callee name for wrapper naming
     if isinstance(node.func, ast.Name):
         callee_name = node.func.id
     elif isinstance(node.func, ast.Attribute):
@@ -152,76 +152,85 @@ def _apply_anti_alias(node: AST, context: AST, args: list[Arg], module: Module) 
     else:
         callee_name = 'unknown'
 
-    # current_callee_expr: the expression to pass as 'f' to the first wrapper.
-    # After the first rewrite node.func changes, so we capture it upfront.
-    current_callee_expr: ast.expr = node.func  # will be replaced by Name after first iteration
-    current_f_name: str = callee_name           # for naming subsequent wrappers
+    sorted_args = sorted(args, key=lambda a: a.index if a.index is not None else -1)
+    n_args = len(node.args)
 
-    for arg in sorted(args, key=lambda a: a.index if a.index is not None else -1):
+    # Name wrapper after callee + all converted arg indices
+    arg_suffix = '_'.join(f'arg{a.index}' for a in sorted_args)
+    base = f'_repro_{callee_name}_{arg_suffix}'
+    repro_name = base
+    n = 2
+    while repro_name in existing:
+        repro_name = f'{base}_{n}'
+        n += 1
+
+    # Build a single wrapper that converts all args and calls f
+    wrapper_params = [ast.arg(arg='f')] + [ast.arg(arg=f'arg{i}') for i in range(n_args)]
+
+    body_stmts: list[ast.stmt] = []
+
+    # One conversion assign per arg
+    for arg in sorted_args:
         idx = arg.index
-        typ = arg.typ
-
-        base = f'_repro_{current_f_name}_arg{idx}'
-        repro_name = base
-        n = 2
-        while repro_name in existing:
-            repro_name = f'{base}_{n}'
-            n += 1
-        existing.add(repro_name)
-
-        n_args = len(node.args)
-        wrapper_params = [ast.arg(arg='f')] + [ast.arg(arg=f'arg{i}') for i in range(n_args)]
-
-        inner_name = f'_arg{idx}'
-        orig_name = f'arg{idx}'
-
-        inner_assign = ast.Assign(
-            targets=[ast.Name(id=inner_name, ctx=ast.Store())],
-            value=ast.Call(func=typ, args=[ast.Name(id=orig_name, ctx=ast.Load())], keywords=[]),
-            lineno=0, col_offset=0,
-        )
-
-        call_args = [
-            ast.Name(id=(inner_name if i == idx else f'arg{i}'), ctx=ast.Load())
-            for i in range(n_args)
-        ]
-        out_assign = ast.Assign(
-            targets=[ast.Name(id='_out', ctx=ast.Store())],
-            value=ast.Call(func=ast.Name(id='f', ctx=ast.Load()), args=call_args, keywords=[]),
-            lineno=0, col_offset=0,
-        )
-
-        stmt_clear = ast.Expr(value=ast.Call(
-            func=ast.Attribute(value=ast.Name(id=orig_name, ctx=ast.Load()), attr='clear', ctx=ast.Load()),
-            args=[], keywords=[],
-        ))
-        stmt_extend = ast.Expr(value=ast.Call(
-            func=ast.Attribute(value=ast.Name(id=orig_name, ctx=ast.Load()), attr='extend', ctx=ast.Load()),
-            args=[ast.Name(id=inner_name, ctx=ast.Load())], keywords=[],
-        ))
-        stmt_return = ast.Return(value=ast.Name(id='_out', ctx=ast.Load()))
-
-        wrapper = FunctionDef(
-            name=repro_name,
-            args=ast.arguments(
-                posonlyargs=[], args=wrapper_params, vararg=None,
-                kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[],
+        body_stmts.append(ast.Assign(
+            targets=[ast.Name(id=f'_arg{idx}', ctx=ast.Store())],
+            value=ast.Call(
+                func=arg.typ,
+                args=[ast.Name(id=f'arg{idx}', ctx=ast.Load())],
+                keywords=[],
             ),
-            body=[inner_assign, out_assign, stmt_clear, stmt_extend, stmt_return],
-            decorator_list=[], returns=None,
             lineno=0, col_offset=0,
-        )
-        ast.fix_missing_locations(wrapper)
-        mod_body.insert(insert_idx, wrapper)
-        insert_idx += 1
+        ))
 
-        # Rewrite call site: repro_name(callee_expr, arg0, arg1, ...)
-        saved_args = list(node.args)
-        node.func = ast.Name(id=repro_name, ctx=ast.Load())
-        node.args = [current_callee_expr] + saved_args
-        # Next iteration: callee is the repro wrapper itself
-        current_callee_expr = ast.Name(id=repro_name, ctx=ast.Load())
-        current_f_name = repro_name
+    # Call f with converted args substituted in
+    converted = {a.index for a in sorted_args}
+    call_args = [
+        ast.Name(id=(f'_arg{i}' if i in converted else f'arg{i}'), ctx=ast.Load())
+        for i in range(n_args)
+    ]
+    body_stmts.append(ast.Assign(
+        targets=[ast.Name(id='_out', ctx=ast.Store())],
+        value=ast.Call(func=ast.Name(id='f', ctx=ast.Load()), args=call_args, keywords=[]),
+        lineno=0, col_offset=0,
+    ))
+
+    # Mutate originals in place (anti-alias)
+    for arg in sorted_args:
+        idx = arg.index
+        body_stmts.append(ast.Expr(value=ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='clear', ctx=ast.Load(),
+            ),
+            args=[], keywords=[],
+        )))
+        body_stmts.append(ast.Expr(value=ast.Call(
+            func=ast.Attribute(
+                value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='extend', ctx=ast.Load(),
+            ),
+            args=[ast.Name(id=f'_arg{idx}', ctx=ast.Load())],
+            keywords=[],
+        )))
+
+    body_stmts.append(ast.Return(value=ast.Name(id='_out', ctx=ast.Load())))
+
+    wrapper = FunctionDef(
+        name=repro_name,
+        args=ast.arguments(
+            posonlyargs=[], args=wrapper_params, vararg=None,
+            kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[],
+        ),
+        body=body_stmts,
+        decorator_list=[], returns=None,
+        lineno=0, col_offset=0,
+    )
+    ast.fix_missing_locations(wrapper)
+    mod_body.insert(insert_idx, wrapper)
+
+    # Rewrite call site once: repro_name(callee_expr, arg0, arg1, ...)
+    callee_expr = node.func
+    original_args = list(node.args)
+    node.func = ast.Name(id=repro_name, ctx=ast.Load())
+    node.args = [callee_expr] + original_args
 
 
 def _apply_strip_return(node: AST) -> None:

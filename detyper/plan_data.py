@@ -19,11 +19,26 @@ _CONTAINER_NAMES = frozenset({
     'Array', 'Vector',
 })
 
+# Generic types that cannot be cast at runtime (generators, iterators, etc.)
+# — strip the annotation but never emit a cast/wrap
+_UNCASTABLE_NAMES = frozenset({
+    'Iterator', 'Generator', 'Iterable', 'AsyncIterator', 'AsyncGenerator',
+    'AsyncIterable', 'Sequence', 'MutableSequence', 'Mapping', 'MutableMapping',
+    'Set', 'MutableSet', 'Callable', 'Awaitable', 'Coroutine',
+})
+
 # Python built-in types where cast() is not valid in Cinder — strip annotation only
 _BUILTIN_NAMES = frozenset({
     'float', 'int', 'str', 'bool', 'bytes', 'list', 'dict', 'set', 'tuple', 'object', 'type',
     'complex', 'bytearray', 'memoryview', 'range', 'slice', 'frozenset',
 })
+
+
+def resolve_annotation(typ: TypeSpec | None) -> TypeSpec | None:
+    """Resolve forward-reference string literals to Name nodes."""
+    if isinstance(typ, ast.Constant) and isinstance(typ.value, str):
+        return ast.Name(id=typ.value, ctx=ast.Load())
+    return typ
 
 
 def classify_type(typ: TypeSpec | None) -> str:
@@ -32,6 +47,8 @@ def classify_type(typ: TypeSpec | None) -> str:
         return 'none'
     if isinstance(typ, ast.Constant) and typ.value is None:
         return 'none'
+    if isinstance(typ, ast.Constant) and isinstance(typ.value, str):
+        return classify_type(ast.Name(id=typ.value, ctx=ast.Load()))  # forward ref
     if isinstance(typ, ast.Name):
         if typ.id == 'None':
             return 'none'
@@ -50,6 +67,8 @@ def classify_type(typ: TypeSpec | None) -> str:
                 return 'checked_list'
             if val.id in _CONTAINER_NAMES:
                 return 'container'
+            if val.id in _UNCASTABLE_NAMES:
+                return 'none'
         return 'cast'
     return 'cast'
 
@@ -89,31 +108,39 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
         n = len(base_params)
 
         param_types: list = [
-            a.annotation if a.annotation else None
+            resolve_annotation(a.annotation if a.annotation else None)
             for a in base_params
         ]
-        return_type: TypeSpec | None = base.returns
+        return_type: TypeSpec | None = resolve_annotation(base.returns)
+        param_locked = [False] * n   # True once a conflict forces slot to None
+        return_locked = False        # True once a conflict forces return_type to None
 
         for fdef in fdefs[1:]:
             fargs = fdef.args.args
             if len(fargs) != n:
-                # Arity mismatch — clear all param types; call-site wrapping is unsafe
+                # Arity mismatch — clear everything; call-site wrapping is unsafe
                 param_types = [None] * n
                 return_type = None
                 break
             for i, (merged, new_arg) in enumerate(zip(param_types, fargs)):
-                new_ann = new_arg.annotation if new_arg.annotation else None
+                if param_locked[i]:
+                    continue
+                new_ann = resolve_annotation(new_arg.annotation if new_arg.annotation else None)
                 if merged is None:
                     param_types[i] = new_ann
                 elif new_ann is not None:
                     if not _annotations_equal(merged, new_ann):
-                        param_types[i] = None  # conflicting — strip annotation, skip wrapping
-            new_ret = fdef.returns
-            if return_type is None:
+                        param_types[i] = None   # conflict — strip, skip wrapping
+                        param_locked[i] = True
+            new_ret = resolve_annotation(fdef.returns)
+            if return_locked:
+                pass
+            elif return_type is None:
                 return_type = new_ret
             elif new_ret is not None:
                 if not _annotations_equal(return_type, new_ret):
-                    return_type = None  # conflicting — strip annotation, skip wrapping
+                    return_type = None          # conflict — strip, skip wrapping
+                    return_locked = True
 
         has_inline = any(
             (isinstance(d, ast.Name) and d.id == 'inline') or
