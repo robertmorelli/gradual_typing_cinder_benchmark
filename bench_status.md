@@ -8,6 +8,7 @@
 - chaos
 - deltablue
 - fannkuch
+- float
 - nbody
 - nqueens
 - pystone
@@ -20,7 +21,6 @@
 
 - espionage
 - evolution
-- float
 - futen
 - go
 - http2

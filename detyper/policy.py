@@ -66,6 +66,8 @@ def classify_type(typ: ast.expr | None) -> TypeKind:
         if isinstance(val, ast.Name):
             if val.id == 'CheckedList':
                 return 'checked_list'
+            if val.id in BUILTIN_NAMES:
+                return 'none'
             if val.id in CONTAINER_NAMES:
                 return 'container'
             if val.id in UNCASTABLE_NAMES:
@@ -87,9 +89,9 @@ PARAM_ACTIONS_BY_KIND: dict[TypeKind, tuple[str, ...]] = {
 BODY_ACTIONS_BY_KIND: dict[TypeKind, tuple[str, ...]] = {
     'none': (),
     'primitive': ('wrap_ann_assign_value',),
-    'checked_list': ('wrap_ann_assign_value',),
-    'container': ('wrap_ann_assign_value',),
-    'cast': ('wrap_ann_assign_value',),
+    'checked_list': ('remove_body_annotation', 'wrap_ann_assign_value'),
+    'container': ('remove_body_annotation', 'wrap_ann_assign_value'),
+    'cast': ('remove_body_annotation', 'wrap_ann_assign_value'),
 }
 
 RETURN_ACTIONS_BY_KIND: dict[TypeKind, tuple[str, ...]] = {
@@ -111,4 +113,3 @@ def body_actions(kind: TypeKind) -> tuple[str, ...]:
 
 def return_actions(kind: TypeKind) -> tuple[str, ...]:
     return RETURN_ACTIONS_BY_KIND[kind]
-

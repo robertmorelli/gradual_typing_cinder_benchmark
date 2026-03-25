@@ -362,6 +362,7 @@ class Detyper:
 
     def __init__(self, intention: RewriteIntention | None = None):
         self._intentions: dict[tuple[int, int, type[RewriteIntention]], RewriteIntention] = {}
+        self.add(NoEditIntention() if intention is None else intention)
 
     def add(self, intention: RewriteIntention) -> None:
         if isinstance(intention, NoEditIntention):

@@ -28,6 +28,17 @@ def perm_name(perm: Permutation) -> str:
     return hex(int("".join(str(int(b)) for b in perm), 2))
 
 
+def _non_jit_stderr_lines(stderr: str) -> list[str]:
+    bad: list[str] = []
+    for raw in stderr.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if not line.startswith('JIT:'):
+            bad.append(raw)
+    return bad
+
+
 # ── Post-processing ───────────────────────────────────────────────────────────
 
 def _convert_sentinel_ann_assigns(body: list) -> list:
@@ -158,6 +169,13 @@ def run_permutation(
         raise RuntimeError(
             f"permutation {perm_hex} failed (exit {proc.returncode}):\n"
             f"{proc.stderr or proc.stdout}"
+        )
+
+    bad_stderr = _non_jit_stderr_lines(proc.stderr)
+    if bad_stderr:
+        preview = '\n'.join(bad_stderr[:20])
+        raise RuntimeError(
+            f"permutation {perm_hex} emitted non-JIT stderr:\n{preview}"
         )
 
     return result

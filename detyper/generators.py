@@ -13,7 +13,7 @@ from .tasks import (
     StripReturn,
     Wrap,
 )
-from .transforms import find_returns, find_ann_assigns
+from .transforms import find_returns, find_ann_assigns, find_name_uses_after
 from .policy import param_actions, body_actions, return_actions
 
 
@@ -139,10 +139,16 @@ def generate_tasks_body(
         kind = classify_type(typ)
         actions = body_actions(kind)
 
+        if 'remove_body_annotation' in actions:
+            # For declaration-only anchors (`x: T`), wrap all subsequent loads of x.
+            # This emits use-site casts like `cast(T, x)` before annotation removal.
+            if ann.value is None and isinstance(ann.target, ast.Name):
+                for use in find_name_uses_after(node, ann.target.id, ann):
+                    result.append(Detyper(Wrap(use, node, [Arg(None, typ, wrap_order=0)], node.name)))
+            result.append(Detyper(RemoveAnnotation(ann, node, [Arg(None, None)], node.name)))
+
         if 'wrap_ann_assign_value' in actions:
-            # Wrap the assignment value only. Subsequent uses are not wrapped because
-            # the annotation is preserved on the AnnAssign, giving Cinder the static type.
-            # Wrapping uses would lose type narrowing (e.g. Optional narrowed in if-blocks).
+            # Wrap only the assigned value; annotation retention/removal is policy-driven.
             result.append(Detyper(Wrap(ann, node, [Arg(None, typ, wrap_order=0)], node.name)))
 
     return result

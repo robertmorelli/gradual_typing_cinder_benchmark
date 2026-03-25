@@ -70,13 +70,33 @@ def find_name_uses_after(
     var_name: str,
     after_stmt: ast.stmt,
 ) -> list[ast.Name]:
-    """All Name(id=var_name, ctx=Load) nodes in func body after after_stmt,
-    excluding nodes inside nested function defs."""
-    body = func.body
-    try:
-        start = next(i for i, s in enumerate(body) if s is after_stmt) + 1
-    except StopIteration:
+    """All Name(id=var_name, ctx=Load) nodes in sibling statements after after_stmt,
+    excluding nodes inside nested function/class defs."""
+
+    def _stmt_lists(node: ast.AST) -> list[list[ast.stmt]]:
+        out: list[list[ast.stmt]] = []
+        for _field, value in ast.iter_fields(node):
+            if isinstance(value, list) and value and all(isinstance(v, ast.stmt) for v in value):
+                out.append(value)
+        return out
+
+    def _find_container(stmts: list[ast.stmt]) -> tuple[list[ast.stmt], int] | None:
+        for i, stmt in enumerate(stmts):
+            if stmt is after_stmt:
+                return (stmts, i)
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_stmts in _stmt_lists(stmt):
+                found = _find_container(child_stmts)
+                if found is not None:
+                    return found
+        return None
+
+    found = _find_container(func.body)
+    if found is None:
         return []
+    body, idx = found
+    start = idx + 1
 
     results: list[ast.Name] = []
 
@@ -84,6 +104,7 @@ def find_name_uses_after(
         def visit_FunctionDef(self, node):
             pass  # don't descend into nested functions
         visit_AsyncFunctionDef = visit_FunctionDef
+        visit_ClassDef = visit_FunctionDef
 
         def visit_Name(self, node):
             if node.id == var_name and isinstance(node.ctx, ast.Load):
