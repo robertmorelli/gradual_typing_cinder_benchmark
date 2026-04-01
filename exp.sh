@@ -1,18 +1,2 @@
-#!/bin/bash
-set -e
-
-if ! command -v go &>/dev/null; then
-    GO_TAR="go1.26.1.linux-amd64.tar.gz"
-    wget -q "https://go.dev/dl/$GO_TAR" -O "/tmp/$GO_TAR"
-    sudo tar -C /usr/local -xzf "/tmp/$GO_TAR"
-    export PATH=$PATH:/usr/local/go/bin
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-fi
-
-git submodule update --init
-sh cinder_env/setup.sh
-source cinder_env/bin/activate
-
-python3 get_bench_status.py
-python3 run_all_proportion_benchmarks.py
+source cinder_env/bin/activate ; python3 run_all_proportion_benchmarks.py
 
