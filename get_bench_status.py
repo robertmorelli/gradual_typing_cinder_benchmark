@@ -1,77 +1,94 @@
-"""Run --test on every benchmark and write bench_status.md."""
+"""Prepare artifacts, run them, and write bench_status.md."""
 
-import subprocess
-import sys
+from __future__ import annotations
+
 from pathlib import Path
 
-BENCH_DIR = Path('static-python-perf/Benchmark')
+from artifact_runner import RunResult
+from benchmark_harness import BENCHMARK_ROOT, benchmark_output_dir, resolve_benchmark_path, run_prepared_artifact
+from detyper.artifacts import build_source_variant, load_source_artifacts
+
 OUT_FILE = Path('bench_status.md')
 
-NO_ADVANCED = []
-WORKS = []
-DETYPE_BROKEN = []
-BENCH_BROKEN = []
+
+def _benchmarks_with_advanced_main() -> list[str]:
+    return sorted(path.parent.parent.name for path in BENCHMARK_ROOT.glob('*/advanced/main.py'))
 
 
-def run_test(name: str) -> tuple[int, int, str]:
-    """Returns (typed_rc, detyped_rc, stderr)."""
-    result = subprocess.run(
-        [sys.executable, 'detype.py', '--test', name],
-        capture_output=True, text=True,
+def _benchmarks_without_advanced_main() -> list[str]:
+    return sorted(
+        path.name for path in BENCHMARK_ROOT.iterdir()
+        if path.is_dir() and not (path / 'advanced' / 'main.py').exists()
+        and path.name != '__pycache__'
     )
-    typed_rc = detyped_rc = -1
-    for line in result.stdout.splitlines():
-        if line.startswith('returncode:'):
-            rc = int(line.split(':')[1].strip())
-            if typed_rc == -1:
-                typed_rc = rc
-            else:
-                detyped_rc = rc
-    return typed_rc, detyped_rc, result.stderr
 
 
-benchmarks = sorted(p.parent.parent.name for p in BENCH_DIR.glob('*/advanced/main.py'))
-no_advanced = sorted(
-    p.name for p in BENCH_DIR.iterdir()
-    if p.is_dir() and not (p / 'advanced' / 'main.py').exists()
-    and p.name != '__pycache__'
-)
-
-print(f"Testing {len(benchmarks)} benchmarks...")
-
-for name in benchmarks:
-    print(f"  {name}...", end='', flush=True)
-    typed_rc, detyped_rc, stderr = run_test(name)
-    if typed_rc != 0:
-        BENCH_BROKEN.append(name)
-        print(f" broken (typed exit {typed_rc})")
-    elif detyped_rc != 0:
-        DETYPE_BROKEN.append(name)
-        print(f" detyping broken (detyped exit {detyped_rc})")
-    else:
-        WORKS.append(name)
-        print(" ok")
-
-
-def ul(items):
+def _unordered_list(items: list[str]) -> str:
     if not items:
         return ''
-    return '\n'.join(f'- {x}' for x in sorted(items)) + '\n'
+    return '\n'.join(f'- {item}' for item in sorted(items)) + '\n'
+
+def _write_labeled_artifact(source_path: Path, variant: tuple[bool, ...], label: str) -> Path:
+    artifacts = load_source_artifacts(source_path, output_dir=benchmark_output_dir(source_path))
+    program = build_source_variant(artifacts, variant)
+    out_dir = artifacts.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f'{artifacts.source_stem}_{label}.py'
+    out_path.write_text(program.source, encoding='utf-8')
+    return out_path
 
 
-lines = ['# Benchmark Status\n']
+def _run_test_pair(name: str) -> tuple[RunResult, RunResult]:
+    source_path = resolve_benchmark_path(name)
+    artifacts = load_source_artifacts(source_path)
+    n = len(artifacts.variant_names)
 
-lines.append('## Detyping works\n')
-lines.append(ul(WORKS))
+    typed_path = _write_labeled_artifact(source_path, tuple(False for _ in range(n)), 'typed')
+    detyped_path = _write_labeled_artifact(source_path, tuple(True for _ in range(n)), 'detyped')
 
-lines.append('## Detyping broken\n')
-lines.append(ul(DETYPE_BROKEN))
+    return (
+        run_prepared_artifact(typed_path, label='typed'),
+        run_prepared_artifact(detyped_path, label='detyped'),
+    )
 
-lines.append('## Benchmark broken\n')
-lines.append(ul(BENCH_BROKEN))
 
-lines.append('## No advanced/main.py\n')
-lines.append(ul(no_advanced))
+def main() -> None:
+    categories: dict[str, list[str]] = {
+        'works': [],
+        'detype_broken': [],
+        'bench_broken': [],
+    }
 
-OUT_FILE.write_text('\n'.join(lines), encoding='utf-8')
-print(f"\nWrote {OUT_FILE}")
+    benchmarks = _benchmarks_with_advanced_main()
+    no_advanced = _benchmarks_without_advanced_main()
+
+    print(f'Testing {len(benchmarks)} benchmarks...')
+    for name in benchmarks:
+        print(f'  {name}...', end='', flush=True)
+        typed_result, detyped_result = _run_test_pair(name)
+        if typed_result.returncode != 0:
+            categories['bench_broken'].append(name)
+            print(f' broken (typed exit {typed_result.returncode})')
+        elif detyped_result.returncode != 0:
+            categories['detype_broken'].append(name)
+            print(f' detyping broken (detyped exit {detyped_result.returncode})')
+        else:
+            categories['works'].append(name)
+            print(' ok')
+
+    lines = ['# Benchmark Status\n']
+    lines.append('## Detyping works\n')
+    lines.append(_unordered_list(categories['works']))
+    lines.append('## Detyping broken\n')
+    lines.append(_unordered_list(categories['detype_broken']))
+    lines.append('## Benchmark broken\n')
+    lines.append(_unordered_list(categories['bench_broken']))
+    lines.append('## No advanced/main.py\n')
+    lines.append(_unordered_list(no_advanced))
+
+    OUT_FILE.write_text('\n'.join(lines), encoding='utf-8')
+    print(f'\nWrote {OUT_FILE}')
+
+
+if __name__ == '__main__':
+    main()

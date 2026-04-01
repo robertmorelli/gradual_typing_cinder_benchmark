@@ -1,36 +1,91 @@
-"""PlanData, FuncInfo, type resolution, and AST visitors."""
+"""PlanData and function-level annotation merging."""
 
+from dataclasses import dataclass
 import ast
-from ast import AST, FunctionDef, Call
-from typing import NamedTuple
+from ast import FunctionDef
 
-from .policy import resolve_annotation, classify_type
+from .rules import resolve_annotation
 
 TypeSpec = ast.expr  # alias for clarity
 
 
-class FuncInfo(NamedTuple):
+@dataclass(frozen=True)
+class FuncInfo:
     fun_name: str
-    param_types: list  # list[TypeSpec | None]
+    param_types: list[TypeSpec | None]
     return_type: TypeSpec | None
     is_detyped: bool
 
 
+@dataclass(frozen=True)
 class PlanData:
-    def __init__(self, funcs: dict):
-        self.funcs: dict[str, FuncInfo] = funcs  # fun_name -> FuncInfo
+    funcs: dict[str, FuncInfo]
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
     return ast.dump(a) == ast.dump(b)
 
 
+def _optional_member(typ: TypeSpec | None) -> TypeSpec | None:
+    if typ is None:
+        return None
+    if isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id == 'Optional':
+        return typ.slice
+    if (
+        isinstance(typ, ast.BinOp)
+        and isinstance(typ.op, ast.BitOr)
+        and isinstance(typ.right, ast.Constant)
+        and typ.right.value is None
+    ):
+        return typ.left
+    if (
+        isinstance(typ, ast.BinOp)
+        and isinstance(typ.op, ast.BitOr)
+        and isinstance(typ.left, ast.Constant)
+        and typ.left.value is None
+    ):
+        return typ.right
+    return None
+
+
+def _merge_annotations(a: TypeSpec | None, b: TypeSpec | None) -> TypeSpec | None | object:
+    """Tiny ad-hoc unifier for benchmark examples.
+
+    Supported special case:
+    - T with Optional[T]
+    - T with T | None
+
+    In that case we keep the optional form, since it is the less specific type.
+    Returns _CONFLICT when the two annotations still do not unify.
+    """
+    if a is None:
+        return b
+    if b is None:
+        return a
+    if _annotations_equal(a, b):
+        return a
+
+    a_inner = _optional_member(a)
+    if a_inner is not None and _annotations_equal(a_inner, b):
+        return a
+
+    b_inner = _optional_member(b)
+    if b_inner is not None and _annotations_equal(a, b_inner):
+        return b
+
+    return _CONFLICT
+
+
+_CONFLICT = object()
+
+
 def build_plan_data(defs: list, guide: dict) -> PlanData:
     """Build PlanData from function defs and a permutation guide.
 
     guide: dict[str, bool] — fun_name -> is_detyped
-    On arity or annotation conflict (e.g. same method name in different classes),
-    the function is marked is_detyped=False (skip detyping rather than crash).
+    On arity or annotation conflict (for example, same method name in different
+    classes), the conflicting annotation slots are cleared to None so wrapping
+    can be skipped safely without discarding the whole function.
     """
     grouped: dict[str, list] = {}
     for fdef in defs:
@@ -62,21 +117,22 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
                 if param_locked[i]:
                     continue
                 new_ann = resolve_annotation(new_arg.annotation if new_arg.annotation else None)
-                if merged is None:
-                    param_types[i] = new_ann
-                elif new_ann is not None:
-                    if not _annotations_equal(merged, new_ann):
-                        param_types[i] = None   # conflict — strip, skip wrapping
-                        param_locked[i] = True
+                merged_ann = _merge_annotations(merged, new_ann)
+                if merged_ann is _CONFLICT:
+                    param_types[i] = None
+                    param_locked[i] = True
+                else:
+                    param_types[i] = merged_ann
             new_ret = resolve_annotation(fdef.returns)
             if return_locked:
                 pass
-            elif return_type is None:
-                return_type = new_ret
-            elif new_ret is not None:
-                if not _annotations_equal(return_type, new_ret):
-                    return_type = None          # conflict — strip, skip wrapping
+            else:
+                merged_ret = _merge_annotations(return_type, new_ret)
+                if merged_ret is _CONFLICT:
+                    return_type = None
                     return_locked = True
+                else:
+                    return_type = merged_ret
 
         has_inline = any(
             (isinstance(d, ast.Name) and d.id == 'inline') or
@@ -93,88 +149,3 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
         )
 
     return PlanData(funcs)
-
-
-# ── AST Visitors ────────────────────────────────────────────────────────────
-
-class _FuncDefCollector(ast.NodeVisitor):
-    def __init__(self):
-        self.result: list[FunctionDef] = []
-
-    def visit_FunctionDef(self, node: FunctionDef):
-        self.result.append(node)
-        self.generic_visit(node)
-
-    visit_AsyncFunctionDef = visit_FunctionDef
-
-
-def all_function_defs(tree: AST) -> list:
-    v = _FuncDefCollector()
-    v.visit(tree)
-    return v.result
-
-
-class _FuncUseCollector(ast.NodeVisitor):
-    """Collect free function call sites (Call.func is Name)."""
-
-    def __init__(self, plan_names: set):
-        self.plan_names = plan_names
-        self.result: list[tuple] = []
-        self._current_func: FunctionDef | None = None
-
-    def visit_FunctionDef(self, node: FunctionDef):
-        old = self._current_func
-        self._current_func = node
-        self.generic_visit(node)
-        self._current_func = old
-
-    visit_AsyncFunctionDef = visit_FunctionDef
-
-    def visit_Call(self, node: Call):
-        if (
-            isinstance(node.func, ast.Name)
-            and node.func.id in self.plan_names
-            and self._current_func is not None
-        ):
-            self.result.append((node, self._current_func))
-        self.generic_visit(node)
-
-
-def all_function_uses(tree: AST, plan_names: set) -> list:
-    """Returns list of (call_node, containing_functiondef) for free function calls."""
-    v = _FuncUseCollector(plan_names)
-    v.visit(tree)
-    return v.result
-
-
-class _MethodUseCollector(ast.NodeVisitor):
-    """Collect method call sites (Call.func is Attribute)."""
-
-    def __init__(self, plan_names: set):
-        self.plan_names = plan_names
-        self.result: list[tuple] = []
-        self._current_func: FunctionDef | None = None
-
-    def visit_FunctionDef(self, node: FunctionDef):
-        old = self._current_func
-        self._current_func = node
-        self.generic_visit(node)
-        self._current_func = old
-
-    visit_AsyncFunctionDef = visit_FunctionDef
-
-    def visit_Call(self, node: Call):
-        if (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr in self.plan_names
-            and self._current_func is not None
-        ):
-            self.result.append((node, self._current_func))
-        self.generic_visit(node)
-
-
-def all_method_uses(tree: AST, plan_names: set) -> list:
-    """Returns list of (call_node, containing_functiondef) for method calls."""
-    v = _MethodUseCollector(plan_names)
-    v.visit(tree)
-    return v.result

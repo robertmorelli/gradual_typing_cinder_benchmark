@@ -3,18 +3,62 @@
 import ast
 from ast import FunctionDef, Module
 
-from .plan_data import PlanData, classify_type
+from .ast_utils import find_ann_assigns, find_name_uses_after, find_returns
+from .plan_data import FuncInfo, PlanData
+from .rules import EditName, body_policy_for, param_policy_for, return_policy_for
 from .tasks import (
     Arg,
-    AntiAlias,
     Detyper,
-    RemoveAnnotation,
-    ReproParam,
-    StripReturn,
-    Wrap,
+    make_preserve_argument_mutations_intent,
+    make_remove_annotation_intent,
+    make_rewrite_param_binding_intent,
+    make_unwrap_checked_return_value_intent,
+    make_wrap_intent,
 )
-from .transforms import find_returns, find_ann_assigns, find_name_uses_after
-from .policy import param_actions, body_actions, return_actions
+
+CallSite = tuple[ast.Call, FunctionDef]
+
+
+def _detyped_info(node: FunctionDef, plan: PlanData) -> FuncInfo | None:
+    info = plan.funcs.get(node.name)
+    if info is None or not info.is_detyped:
+        return None
+    return info
+
+
+def _iter_call_sites(
+    name: str,
+    func_uses: list[CallSite],
+    method_uses: list[CallSite],
+) -> list[CallSite]:
+    free_calls = [
+        (call, caller) for call, caller in func_uses
+        if isinstance(call.func, ast.Name) and call.func.id == name
+    ]
+    method_calls = [
+        (call, caller) for call, caller in method_uses
+        if isinstance(call.func, ast.Attribute) and call.func.attr == name
+    ]
+    return free_calls + method_calls
+
+
+def _call_arg_index(call: ast.Call, param_index: int, param_count: int) -> int | None:
+    if isinstance(call.func, ast.Name):
+        arg_index = param_index
+    else:
+        arg_index = param_index if len(call.args) == param_count else param_index - 1
+    if 0 <= arg_index < len(call.args):
+        return arg_index
+    return None
+
+
+def _wrap_args_for(actions: tuple[EditName, ...], typ: ast.expr | None) -> list[Arg]:
+    wrap_args: list[Arg] = []
+    if 'wrap_with_runtime_type' in actions:
+        wrap_args.append(Arg(None, typ, wrap_order=0))
+    if 'box' in actions:
+        wrap_args.append(Arg(None, None, wrap_order=1))
+    return wrap_args
 
 
 # ── params: definition edits ────────────────────────────────────────────────
@@ -23,26 +67,25 @@ def generate_tasks_params_definition(
     node: FunctionDef,
     plan: PlanData,
 ) -> list[Detyper]:
-    name = node.name
-    if name not in plan.funcs or not plan.funcs[name].is_detyped:
+    info = _detyped_info(node, plan)
+    if info is None:
         return []
 
-    info = plan.funcs[name]
     result: list[Detyper] = []
 
     for idx, typ in enumerate(info.param_types):
         if typ is None:
-            continue  # unannotated param — no tasks
-
-        kind = classify_type(typ)
-        actions = param_actions(kind)
-
-        if 'remove_annotation' in actions:
-            result.append(Detyper(RemoveAnnotation(node, node, [Arg(idx, typ)], node.name)))
             continue
 
-        if 'repro_param' in actions:
-            result.append(Detyper(ReproParam(node, node, [Arg(idx, typ)], node.name)))
+        policy = param_policy_for(typ)
+        actions = policy.definition_edits
+
+        if 'remove_annotation' in actions:
+            result.append(Detyper(make_remove_annotation_intent(node, node, [Arg(idx, typ)], node.name)))
+            continue
+
+        if 'rewrite_param_binding' in actions:
+            result.append(Detyper(make_rewrite_param_binding_intent(node, node, [Arg(idx, typ)], node.name)))
 
     return result
 
@@ -56,67 +99,36 @@ def generate_tasks_params_calls(
     method_uses: list,
     module: Module,
 ) -> list[Detyper]:
-    name = node.name
-    if name not in plan.funcs or not plan.funcs[name].is_detyped:
+    info = _detyped_info(node, plan)
+    if info is None:
         return []
 
-    info = plan.funcs[name]
+    call_sites = _iter_call_sites(node.name, func_uses, method_uses)
     result: list[Detyper] = []
-
-    # Call sites: (call_node, caller_funcdef)
-    free_call_sites = [
-        (call, cf) for call, cf in func_uses
-        if isinstance(call.func, ast.Name) and call.func.id == name
-    ]
-    method_call_sites = [
-        (call, cf) for call, cf in method_uses
-        if isinstance(call.func, ast.Attribute) and call.func.attr == name
-    ]
 
     for idx, typ in enumerate(info.param_types):
         if typ is None:
-            continue  # unannotated param — no tasks
+            continue
+        policy = param_policy_for(typ)
+        actions = policy.call_edits
 
-        kind = classify_type(typ)
-        actions = param_actions(kind)
-
-        if 'anti_alias' in actions:
-            # Keep param name; body gets `name = cast(T, name)`
-            for call, cf in free_call_sites:
-                result.append(Detyper(AntiAlias(call, module, [Arg(idx, typ)], cf.name)))
-            # method call sites: for bound calls (x.f(a)) arg idx = param_idx - 1;
-            # for unbound calls (C.f(self, a)) arg idx = param_idx (self is in call.args)
-            for call, cf in method_call_sites:
-                n_params = len(info.param_types)
-                call_arg_idx = idx if len(call.args) == n_params else idx - 1
-                if call_arg_idx >= 0:
-                    result.append(Detyper(AntiAlias(call, module, [Arg(call_arg_idx, typ)], cf.name)))
+        if 'preserve_argument_mutations' in actions:
+            for call, caller in call_sites:
+                arg_index = _call_arg_index(call, idx, len(info.param_types))
+                if arg_index is None:
+                    continue
+                result.append(Detyper(make_preserve_argument_mutations_intent(
+                    call, module, [Arg(arg_index, typ)], caller.name,
+                )))
             continue
 
-        if 'wrap_arg_primitive' in actions or 'wrap_arg_cast' in actions:
-            # Target the arg node directly so wraps don't interfere with whole-call wraps
-            for call, cf in free_call_sites:
-                if idx < len(call.args):
-                    arg_node = call.args[idx]
-                    if 'wrap_arg_primitive' in actions:
-                        result.append(Detyper(Wrap(arg_node, cf, [
-                            Arg(None, typ, wrap_order=0),
-                            Arg(None, None, wrap_order=1),
-                        ], cf.name)))
-                    else:
-                        result.append(Detyper(Wrap(arg_node, cf, [Arg(None, typ, wrap_order=0)], cf.name)))
-            for call, cf in method_call_sites:
-                n_params = len(info.param_types)
-                call_arg_idx = idx if len(call.args) == n_params else idx - 1
-                if call_arg_idx >= 0 and call_arg_idx < len(call.args):
-                    arg_node = call.args[call_arg_idx]
-                    if 'wrap_arg_primitive' in actions:
-                        result.append(Detyper(Wrap(arg_node, cf, [
-                            Arg(None, typ, wrap_order=0),
-                            Arg(None, None, wrap_order=1),
-                        ], cf.name)))
-                    else:
-                        result.append(Detyper(Wrap(arg_node, cf, [Arg(None, typ, wrap_order=0)], cf.name)))
+        wrap_args = _wrap_args_for(actions, typ)
+        if wrap_args:
+            for call, caller in call_sites:
+                arg_index = _call_arg_index(call, idx, len(info.param_types))
+                if arg_index is None:
+                    continue
+                result.append(Detyper(make_wrap_intent(call.args[arg_index], caller, wrap_args, caller.name)))
 
     return result
 
@@ -126,30 +138,26 @@ def generate_tasks_params_calls(
 def generate_tasks_body(
     node: FunctionDef,
     plan: PlanData,
-    module: Module,
 ) -> list[Detyper]:
-    name = node.name
-    if name not in plan.funcs or not plan.funcs[name].is_detyped:
+    if _detyped_info(node, plan) is None:
         return []
 
     result: list[Detyper] = []
 
     for ann in find_ann_assigns(node):
         typ = ann.annotation
-        kind = classify_type(typ)
-        actions = body_actions(kind)
+        policy = body_policy_for(typ)
+        actions = policy.annotation_edits
 
-        if 'remove_body_annotation' in actions:
-            # For declaration-only anchors (`x: T`), wrap all subsequent loads of x.
-            # This emits use-site casts like `cast(T, x)` before annotation removal.
-            if ann.value is None and isinstance(ann.target, ast.Name):
-                for use in find_name_uses_after(node, ann.target.id, ann):
-                    result.append(Detyper(Wrap(use, node, [Arg(None, typ, wrap_order=0)], node.name)))
-            result.append(Detyper(RemoveAnnotation(ann, node, [Arg(None, None)], node.name)))
+        if 'wrap_later_name_uses' in actions and ann.value is None and isinstance(ann.target, ast.Name):
+            for use in find_name_uses_after(node, ann.target.id, ann):
+                result.append(Detyper(make_wrap_intent(use, node, [Arg(None, typ, wrap_order=0)], node.name)))
 
-        if 'wrap_ann_assign_value' in actions:
-            # Wrap only the assigned value; annotation retention/removal is policy-driven.
-            result.append(Detyper(Wrap(ann, node, [Arg(None, typ, wrap_order=0)], node.name)))
+        if 'remove_annotation' in actions:
+            result.append(Detyper(make_remove_annotation_intent(ann, node, [Arg(None, None)], node.name)))
+
+        if 'wrap_assigned_expression' in actions:
+            result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, typ, wrap_order=0)], node.name)))
 
     return result
 
@@ -160,35 +168,17 @@ def generate_tasks_return_definition(
     node: FunctionDef,
     plan: PlanData,
 ) -> list[Detyper]:
-    name = node.name
-    if name not in plan.funcs or not plan.funcs[name].is_detyped:
+    info = _detyped_info(node, plan)
+    if info is None:
         return []
 
-    info = plan.funcs[name]
     ret_typ = info.return_type
-    kind = classify_type(ret_typ)
-    actions = return_actions(kind)
+    policy = return_policy_for(ret_typ)
+    actions = policy.definition_edits
     result: list[Detyper] = []
 
-    if 'remove_return_annotation' in actions:
-        result.append(Detyper(RemoveAnnotation(node, node, [Arg(None, None)], node.name)))
-
-    return_nodes = find_returns(node)
-
-    if 'strip_internal_checked_list' in actions:
-        # Internal: strip CheckedList[T](...) constructor from return value.
-        for ret in return_nodes:
-            if ret.value is not None:
-                result.append(Detyper(StripReturn(ret, node, [Arg(None, ret_typ)], node.name)))
-
-    if 'wrap_internal_primitive_box' in actions:
-        # Internal: box(T(return_value)).
-        for ret in return_nodes:
-            if ret.value is not None:
-                result.append(Detyper(Wrap(ret, node, [
-                    Arg(None, ret_typ, wrap_order=0),  # T(...)
-                    Arg(None, None, wrap_order=1),     # box(...)
-                ], node.name)))
+    if 'remove_annotation' in actions:
+        result.append(Detyper(make_remove_annotation_intent(node, node, [Arg(None, None)], node.name)))
 
     return result
 
@@ -201,39 +191,33 @@ def generate_tasks_return_calls(
     func_uses: list,    # list of (call_node, caller_funcdef)
     method_uses: list,
 ) -> list[Detyper]:
-    name = node.name
-    if name not in plan.funcs or not plan.funcs[name].is_detyped:
+    info = _detyped_info(node, plan)
+    if info is None:
         return []
 
-    info = plan.funcs[name]
     ret_typ = info.return_type
-    kind = classify_type(ret_typ)
-    actions = return_actions(kind)
+    policy = return_policy_for(ret_typ)
+    value_actions = policy.value_edits
+    call_actions = policy.call_edits
     result: list[Detyper] = []
+    return_nodes = find_returns(node)
 
-    free_calls = [
-        (call, cf) for call, cf in func_uses
-        if isinstance(call.func, ast.Name) and call.func.id == name
-    ]
-    method_calls = [
-        (call, cf) for call, cf in method_uses
-        if isinstance(call.func, ast.Attribute) and call.func.attr == name
-    ]
-    all_calls = free_calls + method_calls
+    if 'unwrap_checked_return_value' in value_actions:
+        for ret in return_nodes:
+            if ret.value is not None:
+                result.append(Detyper(make_unwrap_checked_return_value_intent(
+                    ret, node, [Arg(None, ret_typ)], node.name,
+                )))
 
-    if 'wrap_call_checked_list' in actions:
-        # External: CheckedList[T](call).
-        for call, cf in all_calls:
-            result.append(Detyper(Wrap(call, cf, [Arg(None, ret_typ, wrap_order=0)], cf.name)))
+    return_wrap_args = _wrap_args_for(value_actions, ret_typ)
+    if return_wrap_args:
+        for ret in return_nodes:
+            if ret.value is not None:
+                result.append(Detyper(make_wrap_intent(ret, node, return_wrap_args, node.name)))
 
-    if 'wrap_call_primitive' in actions:
-        # External: T(call).
-        for call, cf in all_calls:
-            result.append(Detyper(Wrap(call, cf, [Arg(None, ret_typ, wrap_order=0)], cf.name)))
-
-    if 'wrap_call_cast' in actions:
-        # External: cast(T, call).
-        for call, cf in all_calls:
-            result.append(Detyper(Wrap(call, cf, [Arg(None, ret_typ, wrap_order=0)], cf.name)))
+    call_wrap_args = _wrap_args_for(call_actions, ret_typ)
+    if call_wrap_args:
+        for call, caller in _iter_call_sites(node.name, func_uses, method_uses):
+            result.append(Detyper(make_wrap_intent(call, caller, call_wrap_args, caller.name)))
 
     return result
