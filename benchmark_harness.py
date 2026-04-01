@@ -11,12 +11,12 @@ BENCHMARK_ROOT = Path('static-python-perf/Benchmark')
 CINDER_PYTHON = Path('cinder_env/bin/python')
 
 
-def resolve_benchmark_path(path_or_name: str) -> Path:
+def resolve_benchmark_path(path_or_name: str, variant: str = 'advanced') -> Path:
     candidate = Path(path_or_name)
     if candidate.exists():
         return candidate
     if '/' not in path_or_name:
-        benchmark_main = BENCHMARK_ROOT / path_or_name / 'advanced' / 'main.py'
+        benchmark_main = BENCHMARK_ROOT / path_or_name / variant / 'main.py'
         if benchmark_main.exists():
             return benchmark_main
     print(f'Error: file not found: {candidate}', file=sys.stderr)

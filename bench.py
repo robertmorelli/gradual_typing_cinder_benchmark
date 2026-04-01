@@ -27,7 +27,7 @@ def _resolve_target_path(target: str) -> Path:
 
 
 def benchmark_file(script_path: Path) -> float:
-    return foo_stabilizer(lambda: run_benchmark_script(script_path))
+    return foo_stabilizer(lambda: run_benchmark_script(script_path)).mean
 
 
 def _write_variant(source_path: Path, variant: tuple[bool, ...], label: str) -> Path:
