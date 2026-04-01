@@ -7,8 +7,33 @@ from ast import AST, FunctionDef
 from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
-from .ast_utils import make_box_expr, make_wrap_expr
 from .rules import classify_type
+
+
+def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
+    """Return a new AST node wrapping expr for the given type."""
+    kind = classify_type(typ)
+    if kind == 'primitive':
+        type_name = typ.id if isinstance(typ, ast.Name) else ast.unparse(typ)
+        return ast.Call(
+            func=ast.Name(id=type_name, ctx=ast.Load()),
+            args=[expr], keywords=[],
+        )
+    if kind in ('cast', 'container'):
+        return ast.Call(
+            func=ast.Name(id='cast', ctx=ast.Load()),
+            args=[typ, expr], keywords=[],
+        )
+    if kind == 'checked_list':
+        return ast.Call(func=typ, args=[expr], keywords=[])
+    return expr
+
+
+def make_box_expr(expr: ast.expr) -> ast.expr:
+    return ast.Call(
+        func=ast.Name(id='box', ctx=ast.Load()),
+        args=[expr], keywords=[],
+    )
 
 
 class Arg(NamedTuple):
