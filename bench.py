@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import itertools
+import math
 import random
 from pathlib import Path
 
@@ -14,16 +16,30 @@ from stabalize import foo_stabilizer, run_benchmark_script
 DEFAULT_BENCHMARK = 'nbody'
 
 
-def _random_variant(n: int, k: int) -> tuple[bool, ...]:
-    indices = set(random.sample(range(n), k))
-    return tuple(index in indices for index in range(n))
-
-
 def _resolve_target_path(target: str) -> Path:
     candidate = Path(target)
     if candidate.exists():
         return candidate
     return resolve_benchmark_path(target)
+
+
+def _sample_variants(n: int, k_detyped: int, iterations: int) -> list[tuple[bool, ...]]:
+    target_samples = min(iterations, math.comb(n, k_detyped))
+    if target_samples == math.comb(n, k_detyped):
+        return [
+            tuple(index in chosen for index in range(n))
+            for chosen in itertools.combinations(range(n), k_detyped)
+        ]
+
+    variants: list[tuple[bool, ...]] = []
+    seen: set[tuple[int, ...]] = set()
+    while len(variants) < target_samples:
+        chosen = tuple(sorted(random.sample(range(n), k_detyped)))
+        if chosen in seen:
+            continue
+        seen.add(chosen)
+        variants.append(tuple(index in chosen for index in range(n)))
+    return variants
 
 
 def benchmark_file(script_path: Path) -> float:
@@ -45,8 +61,13 @@ def _print_benchmark_result(script_path: Path) -> None:
     print(f'{script_path.name}: {stable_mean:.4f}')
 
 
-def _print_by_proportion_row(source_path: Path, proportion: float, variant: tuple[bool, ...]) -> None:
-    label = f'prop_{sum(variant)}'
+def _print_by_proportion_row(
+    source_path: Path,
+    proportion: float,
+    variant: tuple[bool, ...],
+    sample_index: int,
+) -> None:
+    label = f'prop_{sum(variant):02d}_s{sample_index:02d}'
     artifact_path = _write_variant(source_path, variant, label)
     stable_mean = benchmark_file(artifact_path)
     print(f'{proportion:>12.2f}  {sum(variant):>7}  {stable_mean:>10.4f}s')
@@ -60,24 +81,21 @@ def _run_by_proportion(source_path: Path, proportions: int, iterations: int) -> 
     print('-' * 36)
 
     zero_variant = tuple(False for _ in range(n))
-    _print_by_proportion_row(source_path, 0.0, zero_variant)
+    _print_by_proportion_row(source_path, 0.0, zero_variant, 1)
 
-    seen: set[tuple[bool, ...]] = {zero_variant}
+    seen_counts: set[int] = set()
     for step in range(1, proportions):
-        k_detyped = max(1, min(n - 1, round(step * n / proportions)))
-        samples = 0
-        attempts = 0
-        while samples < iterations and attempts < iterations * 10:
-            attempts += 1
-            variant = _random_variant(n, k_detyped)
-            if variant in seen:
-                continue
-            seen.add(variant)
-            _print_by_proportion_row(source_path, k_detyped / n if n else 0.0, variant)
-            samples += 1
+        detyped = max(1, min(n - 1, round(step * n / proportions)))
+        if detyped in seen_counts:
+            continue
+        seen_counts.add(detyped)
+        variants = _sample_variants(n, detyped, iterations)
+        for sample_index, variant in enumerate(variants, start=1):
+            _print_by_proportion_row(source_path, detyped / n if n else 0.0, variant, sample_index)
 
-    full_variant = tuple(True for _ in range(n))
-    _print_by_proportion_row(source_path, 1.0, full_variant)
+    if n > 0:
+        full_variant = tuple(True for _ in range(n))
+        _print_by_proportion_row(source_path, 1.0, full_variant, 1)
 
 
 def main() -> None:

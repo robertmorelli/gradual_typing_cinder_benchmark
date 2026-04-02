@@ -8,7 +8,6 @@ from pathlib import Path
 from artifact_runner import RunResult, run_python_artifact, write_run_result
 
 BENCHMARK_ROOT = Path('static-python-perf/Benchmark')
-CINDER_PYTHON = Path('cinder_env/bin/python')
 
 
 def resolve_benchmark_path(path_or_name: str, variant: str = 'advanced') -> Path:
@@ -33,6 +32,6 @@ def benchmark_output_dir(source_path: Path) -> Path:
 
 
 def run_prepared_artifact(artifact_path: Path, label: str) -> RunResult:
-    result = run_python_artifact(CINDER_PYTHON, artifact_path, label=label)
+    result = run_python_artifact(artifact_path, label=label)
     write_run_result(result)
     return result

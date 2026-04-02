@@ -18,12 +18,11 @@ class RunResult:
 
 
 def run_python_artifact(
-    python_executable: Path,
     artifact_path: Path,
     label: str | None = None,
 ) -> RunResult:
     proc = subprocess.run(
-        [str(python_executable), str(artifact_path)],
+        ['python', str(artifact_path)],
         capture_output=True,
         text=True,
     )

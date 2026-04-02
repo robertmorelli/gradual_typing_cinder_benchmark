@@ -19,11 +19,17 @@ class StabilizationResult:
     ci_upper: float
 
 
-def _default_python_executable() -> str:
-    cinder_python = Path('cinder_env/bin/python')
-    if cinder_python.exists():
-        return str(cinder_python)
-    return sys.executable
+GLOBAL_RETRIES = 20
+remaining_retries = GLOBAL_RETRIES
+
+
+def _consume_retry() -> bool:
+    global remaining_retries
+
+    if remaining_retries <= 0:
+        return False
+    remaining_retries -= 1
+    return True
 
 
 def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=50) -> StabilizationResult:
@@ -73,19 +79,37 @@ def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=
     )
 
 
-def run_benchmark_script(script_path: Path, python_executable: str | None = None) -> float:
-    executable = python_executable or _default_python_executable()
-    proc = subprocess.run(
-        [executable, str(script_path)],
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
+def run_benchmark_script(script_path: Path) -> float:
+    while True:
+        try:
+            proc = subprocess.run(
+                ['python', str(script_path)],
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            if _consume_retry():
+                continue
+            raise
+
+        if proc.returncode != 0:
+            if _consume_retry():
+                continue
+            raise RuntimeError(
+                f'benchmark script failed ({proc.returncode}): {script_path}\n'
+                f'{proc.stderr or proc.stdout}'
+            )
+
+        try:
+            return float(proc.stdout.strip().splitlines()[0])
+        except (IndexError, ValueError):
+            if _consume_retry():
+                continue
+
         raise RuntimeError(
-            f'benchmark script failed ({proc.returncode}): {script_path}\n'
-            f'{proc.stderr or proc.stdout}'
+            f'benchmark script produced no parseable timing output: {script_path}\n'
+            f'{proc.stdout or proc.stderr}'
         )
-    return float(proc.stdout.strip().splitlines()[0])
 
 
 def main() -> None:
