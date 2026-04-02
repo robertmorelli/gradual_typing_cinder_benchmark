@@ -16,7 +16,7 @@ from stabalize import StabilizationResult, foo_stabilizer, run_benchmark_script
 OUT_FILE = Path('proportion_benchmark_report.md')
 STATUS_FILE = Path('bench_status.md')
 RNG_SEED = 0
-ITERATIONS_PER_PROPORTION = 2
+ITERATIONS_PER_PROPORTION = 20
 
 
 @dataclass(frozen=True)
