@@ -1,8 +1,7 @@
 
 # How to run exp:
 
-```bashi
-  sh setup.sh # setup
-  sh exp.sh # run exp
+```bash
+bash setup.sh
+bash exp.sh
 ```
-

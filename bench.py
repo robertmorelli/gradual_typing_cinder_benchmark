@@ -51,7 +51,7 @@ def _write_variant(source_path: Path, variant: tuple[bool, ...], label: str) -> 
     artifacts = load_source_artifacts(source_path, output_dir=output_dir)
     program = build_source_variant(artifacts, variant)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f'{artifacts.source_stem}_{label}.py'
+    out_path = output_dir / f'{artifacts.source_stem}_{program.perm_hex}_{label}.py'
     out_path.write_text(program.source, encoding='utf-8')
     return out_path
 

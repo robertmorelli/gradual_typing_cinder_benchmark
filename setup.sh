@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 if ! command -v go &>/dev/null; then
     GO_TAR="go1.26.1.linux-amd64.tar.gz"
@@ -10,4 +10,4 @@ if ! command -v go &>/dev/null; then
 fi
 
 git submodule update --init
-sh cinder_env/setup.sh
+bash cinder_env/setup.sh

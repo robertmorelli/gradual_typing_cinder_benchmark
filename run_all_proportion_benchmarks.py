@@ -89,16 +89,16 @@ def _sample_variants(total: int, detyped: int, samples: int, rng: random.Random)
     return variants
 
 
-def _artifact_path(source_path: Path, detyped: int, sample_index: int) -> Path:
+def _artifact_path(source_path: Path, perm_hex: str, detyped: int, sample_index: int) -> Path:
     output_dir = benchmark_output_dir(source_path) / 'proportion_sweep'
     output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir / f'{source_path.stem}_k{detyped:02d}_s{sample_index:02d}.py'
+    return output_dir / f'{source_path.stem}_{perm_hex}_k{detyped:02d}_s{sample_index:02d}.py'
 
 
 def _write_variant(source_path: Path, variant: tuple[bool, ...], detyped: int, sample_index: int) -> Path:
     artifacts = load_source_artifacts(source_path, output_dir=benchmark_output_dir(source_path))
     program = build_source_variant(artifacts, variant)
-    out_path = _artifact_path(source_path, detyped, sample_index)
+    out_path = _artifact_path(source_path, program.perm_hex, detyped, sample_index)
     out_path.write_text(program.source, encoding='utf-8')
     return out_path
 
