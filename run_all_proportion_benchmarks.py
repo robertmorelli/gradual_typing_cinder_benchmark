@@ -164,7 +164,7 @@ def run_benchmark(name: str, rng: random.Random) -> list[BenchmarkReport]:
 
 def _summarize_runs(runs: list[ProportionRun]) -> str:
     lines = [
-        '| proportion | detyped | samples | mean time | min | max | avg batches | all converged | status |',
+        '| proportion | detyped | timed samples | mean time | min | max | avg batches | all converged | status |',
         '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |',
     ]
     by_detyped: dict[int, list[ProportionRun]] = {}
@@ -192,7 +192,7 @@ def _summarize_runs(runs: list[ProportionRun]) -> str:
 
         status = f'{len(failures)} failed' if failures else 'ok'
         lines.append(
-            f'| {proportion:.2f} | {detyped}/{group[0].total} | {len(group)} '
+            f'| {proportion:.2f} | {detyped}/{group[0].total} | {len(successes)} '
             f'| {timing} | {low_s} | {high_s} | {avg_batches} | {all_converged} | {status} |'
         )
 

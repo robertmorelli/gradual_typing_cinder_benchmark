@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -22,7 +23,7 @@ def run_python_artifact(
     label: str | None = None,
 ) -> RunResult:
     proc = subprocess.run(
-        ['python', str(artifact_path)],
+        [sys.executable, str(artifact_path)],
         capture_output=True,
         text=True,
     )
@@ -59,7 +60,7 @@ def non_jit_stderr_lines(stderr: str) -> list[str]:
     return bad
 
 
-def raise_for_failed_run(result: RunResult) -> None:
+def raise_for_failed_run(result: RunResult, *, require_parseable_time: bool = False) -> None:
     if result.returncode != 0:
         raise RuntimeError(
             f'artifact {result.label} failed (exit {result.returncode}):\n'
@@ -72,3 +73,24 @@ def raise_for_failed_run(result: RunResult) -> None:
         raise RuntimeError(
             f'artifact {result.label} emitted non-JIT stderr:\n{preview}'
         )
+
+    if require_parseable_time and parse_stdout_time(result.stdout) is None:
+        raise RuntimeError(
+            f'artifact {result.label} produced no parseable timing output:\n'
+            f'{result.stdout or result.stderr}'
+        )
+
+
+def run_timed_python_artifact(
+    artifact_path: Path,
+    label: str | None = None,
+) -> float:
+    result = run_python_artifact(artifact_path, label=label)
+    raise_for_failed_run(result, require_parseable_time=True)
+    timing = parse_stdout_time(result.stdout)
+    if timing is None:
+        raise RuntimeError(
+            f'artifact {result.label} produced no parseable timing output:\n'
+            f'{result.stdout or result.stderr}'
+        )
+    return timing

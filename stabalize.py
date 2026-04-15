@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import random
 import statistics
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+from artifact_runner import run_timed_python_artifact
 
 
 @dataclass(frozen=True)
@@ -19,17 +20,7 @@ class StabilizationResult:
     ci_upper: float
 
 
-GLOBAL_RETRIES = 20
-remaining_retries = GLOBAL_RETRIES
-
-
-def _consume_retry() -> bool:
-    global remaining_retries
-
-    if remaining_retries <= 0:
-        return False
-    remaining_retries -= 1
-    return True
+DEFAULT_RUN_RETRIES = 20
 
 
 def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=50) -> StabilizationResult:
@@ -79,37 +70,16 @@ def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=
     )
 
 
-def run_benchmark_script(script_path: Path) -> float:
-    while True:
+def run_benchmark_script(script_path: Path, retries: int = DEFAULT_RUN_RETRIES) -> float:
+    attempts = retries + 1
+    for attempt in range(1, attempts + 1):
         try:
-            proc = subprocess.run(
-                ['python', str(script_path)],
-                capture_output=True,
-                text=True,
-            )
-        except OSError:
-            if _consume_retry():
-                continue
-            raise
+            return run_timed_python_artifact(script_path)
+        except (OSError, RuntimeError):
+            if attempt == attempts:
+                raise
 
-        if proc.returncode != 0:
-            if _consume_retry():
-                continue
-            raise RuntimeError(
-                f'benchmark script failed ({proc.returncode}): {script_path}\n'
-                f'{proc.stderr or proc.stdout}'
-            )
-
-        try:
-            return float(proc.stdout.strip().splitlines()[0])
-        except (IndexError, ValueError):
-            if _consume_retry():
-                continue
-
-        raise RuntimeError(
-            f'benchmark script produced no parseable timing output: {script_path}\n'
-            f'{proc.stdout or proc.stderr}'
-        )
+    raise AssertionError('unreachable')
 
 
 def main() -> None:

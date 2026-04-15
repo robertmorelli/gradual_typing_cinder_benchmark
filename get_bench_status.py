@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from artifact_runner import RunResult
+from artifact_runner import RunResult, raise_for_failed_run
 from benchmark_harness import BENCHMARK_ROOT, benchmark_output_dir, resolve_benchmark_path, run_prepared_artifact
 from detyper.artifacts import build_source_variant, load_source_artifacts
 
@@ -27,6 +27,7 @@ def _unordered_list(items: list[str]) -> str:
     if not items:
         return ''
     return '\n'.join(f'- {item}' for item in sorted(items)) + '\n'
+
 
 def _write_labeled_artifact(source_path: Path, variant: tuple[bool, ...], label: str) -> Path:
     artifacts = load_source_artifacts(source_path, output_dir=benchmark_output_dir(source_path))
@@ -52,6 +53,14 @@ def _run_test_pair(name: str) -> tuple[RunResult, RunResult]:
     )
 
 
+def _timing_failure(result: RunResult) -> str | None:
+    try:
+        raise_for_failed_run(result, require_parseable_time=True)
+    except RuntimeError as exc:
+        return str(exc).splitlines()[0]
+    return None
+
+
 def main() -> None:
     categories: dict[str, list[str]] = {
         'works': [],
@@ -66,12 +75,14 @@ def main() -> None:
     for name in benchmarks:
         print(f'  {name}...', end='', flush=True)
         typed_result, detyped_result = _run_test_pair(name)
-        if typed_result.returncode != 0:
+        typed_failure = _timing_failure(typed_result)
+        detyped_failure = _timing_failure(detyped_result)
+        if typed_failure is not None:
             categories['bench_broken'].append(name)
-            print(f' broken (typed exit {typed_result.returncode})')
-        elif detyped_result.returncode != 0:
+            print(f' broken ({typed_failure})')
+        elif detyped_failure is not None:
             categories['detype_broken'].append(name)
-            print(f' detyping broken (detyped exit {detyped_result.returncode})')
+            print(f' detyping broken ({detyped_failure})')
         else:
             categories['works'].append(name)
             print(' ok')
