@@ -39,17 +39,19 @@ def _write_labeled_artifact(source_path: Path, variant: tuple[bool, ...], label:
     return out_path
 
 
-def _run_test_pair(name: str) -> tuple[RunResult, RunResult]:
+def _run_test_triplet(name: str) -> tuple[RunResult, RunResult, RunResult]:
     source_path = resolve_benchmark_path(name)
     artifacts = load_source_artifacts(source_path)
     n = len(artifacts.variant_names)
 
     typed_path = _write_labeled_artifact(source_path, tuple(False for _ in range(n)), 'typed')
     detyped_path = _write_labeled_artifact(source_path, tuple(True for _ in range(n)), 'detyped')
+    untyped_path = resolve_benchmark_path(name, variant='untyped')
 
     return (
         run_prepared_artifact(typed_path, label='typed'),
         run_prepared_artifact(detyped_path, label='detyped'),
+        run_prepared_artifact(untyped_path, label='untyped'),
     )
 
 
@@ -74,15 +76,19 @@ def main() -> None:
     print(f'Testing {len(benchmarks)} benchmarks...')
     for name in benchmarks:
         print(f'  {name}...', end='', flush=True)
-        typed_result, detyped_result = _run_test_pair(name)
+        typed_result, detyped_result, untyped_result = _run_test_triplet(name)
         typed_failure = _timing_failure(typed_result)
         detyped_failure = _timing_failure(detyped_result)
+        untyped_failure = _timing_failure(untyped_result)
         if typed_failure is not None:
             categories['bench_broken'].append(name)
             print(f' broken ({typed_failure})')
         elif detyped_failure is not None:
             categories['detype_broken'].append(name)
             print(f' detyping broken ({detyped_failure})')
+        elif untyped_failure is not None:
+            categories['bench_broken'].append(name)
+            print(f' untyped broken ({untyped_failure})')
         else:
             categories['works'].append(name)
             print(' ok')
