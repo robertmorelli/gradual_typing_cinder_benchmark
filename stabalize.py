@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from artifact_runner import run_timed_python_artifact
+from artifact_runner import TimedRunResult, run_timed_python_artifact, run_timed_python_artifact_detailed
 
 
 @dataclass(frozen=True)
@@ -20,17 +20,28 @@ class StabilizationResult:
     ci_upper: float
 
 
+DEFAULT_BATCH_SIZE = 8
+DEFAULT_TOLERANCE = 0.1
+DEFAULT_ALPHA = 0.05
+DEFAULT_MAX_ITERATIONS = 50
+BOOTSTRAP_RESAMPLES = 10_000
 DEFAULT_RUN_RETRIES = 20
 
 
-def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=50) -> StabilizationResult:
+def foo_stabilizer(
+    foo,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    tolerance: float = DEFAULT_TOLERANCE,
+    alpha: float = DEFAULT_ALPHA,
+    max_iterations: int = DEFAULT_MAX_ITERATIONS,
+) -> StabilizationResult:
     data = [foo() for _ in range(batch_size)]
     batches = 1
     for _ in range(max_iterations):
         sample_mean = statistics.fmean(data)
         resample_means = sorted(
             statistics.fmean(random.choices(data, k=len(data)))
-            for _ in range(10_000)
+            for _ in range(BOOTSTRAP_RESAMPLES)
         )
         lower_index = int((alpha / 2) * len(resample_means))
         upper_index = int((1 - alpha / 2) * len(resample_means)) - 1
@@ -53,7 +64,7 @@ def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=
     sample_mean = statistics.fmean(data)
     resample_means = sorted(
         statistics.fmean(random.choices(data, k=len(data)))
-        for _ in range(10_000)
+        for _ in range(BOOTSTRAP_RESAMPLES)
     )
     lower_index = int((alpha / 2) * len(resample_means))
     upper_index = int((1 - alpha / 2) * len(resample_means)) - 1
@@ -71,11 +82,34 @@ def foo_stabilizer(foo, batch_size=8, tolerance=0.1, alpha=0.05, max_iterations=
 
 
 def run_benchmark_script(script_path: Path, retries: int = DEFAULT_RUN_RETRIES) -> float:
+    return run_benchmark_script_detailed(script_path, retries=retries).timing
+
+
+@dataclass(frozen=True)
+class DetailedBenchmarkRun:
+    timing: float
+    attempts: int
+    timed_run: TimedRunResult
+    attempt_errors: tuple[str, ...]
+
+
+def run_benchmark_script_detailed(
+    script_path: Path,
+    retries: int = DEFAULT_RUN_RETRIES,
+) -> DetailedBenchmarkRun:
+    attempt_errors: list[str] = []
     attempts = retries + 1
     for attempt in range(1, attempts + 1):
         try:
-            return run_timed_python_artifact(script_path)
-        except (OSError, RuntimeError):
+            timed_run = run_timed_python_artifact_detailed(script_path)
+            return DetailedBenchmarkRun(
+                timing=timed_run.timing,
+                attempts=attempt,
+                timed_run=timed_run,
+                attempt_errors=tuple(attempt_errors),
+            )
+        except (OSError, RuntimeError) as exc:
+            attempt_errors.append(str(exc))
             if attempt == attempts:
                 raise
 

@@ -11,10 +11,11 @@ still high-level: generators turn them into concrete RewriteIntention objects.
 from __future__ import annotations
 
 import ast
+import copy
 from dataclasses import dataclass
 from typing import Literal
 
-TypeKind = Literal['none', 'primitive', 'checked_list', 'container', 'cast']
+TypeKind = Literal['none', 'builtin', 'primitive', 'checked_list', 'container', 'cast']
 EditName = Literal[
     'remove_annotation',
     'rewrite_param_binding',
@@ -79,6 +80,10 @@ BUILTIN_NAMES = frozenset({
     'frozenset',
 })
 
+TYPING_BUILTIN_NAMES = frozenset({
+    'List', 'Dict', 'Set', 'Tuple', 'FrozenSet', 'Type',
+})
+
 
 def resolve_annotation(typ: ast.expr | None) -> ast.expr | None:
     """Resolve forward-reference string literals to Name nodes."""
@@ -87,8 +92,44 @@ def resolve_annotation(typ: ast.expr | None) -> ast.expr | None:
     return typ
 
 
-def classify_type(typ: ast.expr | None) -> TypeKind:
+def expand_aliases(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ast.expr | None:
+    """Expand simple type aliases recursively before classification."""
+    if typ is None or not aliases:
+        return typ
+
+    typ = resolve_annotation(typ)
+    if typ is None:
+        return None
+
+    if isinstance(typ, ast.Name) and typ.id in aliases:
+        return expand_aliases(copy.deepcopy(aliases[typ.id]), aliases)
+
+    if isinstance(typ, ast.Subscript):
+        expanded_value = expand_aliases(typ.value, aliases)
+        expanded_slice = expand_aliases(typ.slice, aliases)
+        return ast.Subscript(
+            value=expanded_value if expanded_value is not None else typ.value,
+            slice=expanded_slice if expanded_slice is not None else typ.slice,
+            ctx=typ.ctx,
+        )
+
+    if isinstance(typ, ast.Tuple):
+        return ast.Tuple(
+            elts=[expand_aliases(elt, aliases) or elt for elt in typ.elts],
+            ctx=typ.ctx,
+        )
+
+    if isinstance(typ, ast.BinOp) and isinstance(typ.op, ast.BitOr):
+        left = expand_aliases(typ.left, aliases) or typ.left
+        right = expand_aliases(typ.right, aliases) or typ.right
+        return ast.BinOp(left=left, op=typ.op, right=right)
+
+    return typ
+
+
+def classify_type(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> TypeKind:
     """Classify an annotation into a rule type-kind."""
+    typ = expand_aliases(typ, aliases)
     if typ is None:
         return 'none'
     if isinstance(typ, ast.Constant) and typ.value is None:
@@ -100,18 +141,18 @@ def classify_type(typ: ast.expr | None) -> TypeKind:
             return 'none'
         if typ.id in PRIMITIVE_NAMES:
             return 'primitive'
-        if typ.id in BUILTIN_NAMES:
-            return 'none'
+        if typ.id in BUILTIN_NAMES or typ.id in TYPING_BUILTIN_NAMES:
+            return 'builtin'
         return 'cast'
     if isinstance(typ, ast.Tuple):
-        return 'none'
+        return 'builtin'
     if isinstance(typ, ast.Subscript):
         val = typ.value
         if isinstance(val, ast.Name):
             if val.id == 'CheckedList':
                 return 'checked_list'
-            if val.id in BUILTIN_NAMES:
-                return 'none'
+            if val.id in BUILTIN_NAMES or val.id in TYPING_BUILTIN_NAMES:
+                return 'builtin'
             if val.id in CONTAINER_NAMES:
                 return 'container'
             if val.id in UNCASTABLE_NAMES:
@@ -122,6 +163,10 @@ def classify_type(typ: ast.expr | None) -> TypeKind:
 
 PARAM_POLICIES: dict[TypeKind, ParamPolicy] = {
     'none': ParamPolicy(
+        definition_edits=('remove_annotation',),
+        call_edits=(),
+    ),
+    'builtin': ParamPolicy(
         definition_edits=('remove_annotation',),
         call_edits=(),
     ),
@@ -146,6 +191,7 @@ PARAM_POLICIES: dict[TypeKind, ParamPolicy] = {
 
 BODY_POLICIES: dict[TypeKind, BodyPolicy] = {
     'none': BodyPolicy(annotation_edits=()),
+    'builtin': BodyPolicy(annotation_edits=('remove_annotation',)),
     'primitive': BodyPolicy(annotation_edits=('wrap_assigned_expression',)),
     'checked_list': BodyPolicy(
         annotation_edits=('wrap_later_name_uses', 'remove_annotation', 'wrap_assigned_expression'),
@@ -161,6 +207,11 @@ BODY_POLICIES: dict[TypeKind, BodyPolicy] = {
 
 RETURN_POLICIES: dict[TypeKind, ReturnPolicy] = {
     'none': ReturnPolicy(
+        definition_edits=('remove_annotation',),
+        value_edits=(),
+        call_edits=(),
+    ),
+    'builtin': ReturnPolicy(
         definition_edits=('remove_annotation',),
         value_edits=(),
         call_edits=(),
@@ -188,16 +239,16 @@ RETURN_POLICIES: dict[TypeKind, ReturnPolicy] = {
 }
 
 
-def param_policy_for(typ: ast.expr | None) -> ParamPolicy:
+def param_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ParamPolicy:
     """Return the full policy caused by a parameter annotation."""
-    return PARAM_POLICIES[classify_type(typ)]
+    return PARAM_POLICIES[classify_type(typ, aliases)]
 
 
-def body_policy_for(typ: ast.expr | None) -> BodyPolicy:
+def body_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> BodyPolicy:
     """Return the full policy caused by a body annotation."""
-    return BODY_POLICIES[classify_type(typ)]
+    return BODY_POLICIES[classify_type(typ, aliases)]
 
 
-def return_policy_for(typ: ast.expr | None) -> ReturnPolicy:
+def return_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ReturnPolicy:
     """Return the full policy caused by a return annotation."""
-    return RETURN_POLICIES[classify_type(typ)]
+    return RETURN_POLICIES[classify_type(typ, aliases)]

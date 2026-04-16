@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass
 import ast
-from ast import FunctionDef
+from ast import FunctionDef, Module
 
-from .rules import resolve_annotation
+from .rules import expand_aliases, resolve_annotation
 
 TypeSpec = ast.expr  # alias for clarity
 
@@ -20,6 +20,7 @@ class FuncInfo:
 @dataclass(frozen=True)
 class PlanData:
     funcs: dict[str, FuncInfo]
+    aliases: dict[str, TypeSpec]
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
@@ -79,7 +80,37 @@ def _merge_annotations(a: TypeSpec | None, b: TypeSpec | None) -> TypeSpec | Non
 _CONFLICT = object()
 
 
-def build_plan_data(defs: list, guide: dict) -> PlanData:
+def _is_type_expr(expr: ast.expr | None) -> bool:
+    if expr is None:
+        return False
+    if isinstance(expr, ast.Name):
+        return True
+    if isinstance(expr, ast.Constant):
+        return expr.value is None or isinstance(expr.value, str)
+    if isinstance(expr, ast.Subscript):
+        return _is_type_expr(expr.value) and _is_type_expr(expr.slice)
+    if isinstance(expr, ast.Tuple):
+        return all(_is_type_expr(elt) for elt in expr.elts)
+    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.BitOr):
+        return _is_type_expr(expr.left) and _is_type_expr(expr.right)
+    return False
+
+
+def _collect_type_aliases(module: Module) -> dict[str, TypeSpec]:
+    aliases: dict[str, TypeSpec] = {}
+    for stmt in module.body:
+        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+            resolved = resolve_annotation(stmt.value)
+            if _is_type_expr(resolved):
+                aliases[stmt.targets[0].id] = resolved
+        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.value is not None:
+            resolved = resolve_annotation(stmt.value)
+            if _is_type_expr(resolved):
+                aliases[stmt.target.id] = resolved
+    return {name: expand_aliases(typ, aliases) or typ for name, typ in aliases.items()}
+
+
+def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     """Build PlanData from function defs and a permutation guide.
 
     guide: dict[str, bool] — fun_name -> is_detyped
@@ -87,6 +118,7 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
     classes), the conflicting annotation slots are cleared to None so wrapping
     can be skipped safely without discarding the whole function.
     """
+    aliases = _collect_type_aliases(module)
     grouped: dict[str, list] = {}
     for fdef in defs:
         name = fdef.name
@@ -99,10 +131,10 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
         n = len(base_params)
 
         param_types: list = [
-            resolve_annotation(a.annotation if a.annotation else None)
+            expand_aliases(resolve_annotation(a.annotation if a.annotation else None), aliases)
             for a in base_params
         ]
-        return_type: TypeSpec | None = resolve_annotation(base.returns)
+        return_type: TypeSpec | None = expand_aliases(resolve_annotation(base.returns), aliases)
         param_locked = [False] * n   # True once a conflict forces slot to None
         return_locked = False        # True once a conflict forces return_type to None
 
@@ -116,14 +148,14 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
             for i, (merged, new_arg) in enumerate(zip(param_types, fargs)):
                 if param_locked[i]:
                     continue
-                new_ann = resolve_annotation(new_arg.annotation if new_arg.annotation else None)
+                new_ann = expand_aliases(resolve_annotation(new_arg.annotation if new_arg.annotation else None), aliases)
                 merged_ann = _merge_annotations(merged, new_ann)
                 if merged_ann is _CONFLICT:
                     param_types[i] = None
                     param_locked[i] = True
                 else:
                     param_types[i] = merged_ann
-            new_ret = resolve_annotation(fdef.returns)
+            new_ret = expand_aliases(resolve_annotation(fdef.returns), aliases)
             if return_locked:
                 pass
             else:
@@ -148,4 +180,4 @@ def build_plan_data(defs: list, guide: dict) -> PlanData:
             is_detyped=is_detyped,
         )
 
-    return PlanData(funcs)
+    return PlanData(funcs=funcs, aliases=aliases)

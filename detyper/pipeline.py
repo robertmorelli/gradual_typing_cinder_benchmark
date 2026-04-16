@@ -111,7 +111,7 @@ def build_detyped_program(
     method_uses = all_method_uses(tree, plan_names)
 
     guide: GuideType = dict(zip(fun_names, perm))
-    plan = build_plan_data(defs, guide)
+    plan = build_plan_data(module, defs, guide)
 
     all_detypers: list[Detyper] = []
     for fdef in defs:

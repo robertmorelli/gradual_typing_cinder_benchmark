@@ -18,6 +18,12 @@ class RunResult:
     stderr: str
 
 
+@dataclass(frozen=True)
+class TimedRunResult:
+    timing: float
+    result: RunResult
+
+
 def run_python_artifact(
     artifact_path: Path,
     label: str | None = None,
@@ -85,6 +91,13 @@ def run_timed_python_artifact(
     artifact_path: Path,
     label: str | None = None,
 ) -> float:
+    return run_timed_python_artifact_detailed(artifact_path, label=label).timing
+
+
+def run_timed_python_artifact_detailed(
+    artifact_path: Path,
+    label: str | None = None,
+) -> TimedRunResult:
     result = run_python_artifact(artifact_path, label=label)
     raise_for_failed_run(result, require_parseable_time=True)
     timing = parse_stdout_time(result.stdout)
@@ -93,4 +106,4 @@ def run_timed_python_artifact(
             f'artifact {result.label} produced no parseable timing output:\n'
             f'{result.stdout or result.stderr}'
         )
-    return timing
+    return TimedRunResult(timing=timing, result=result)

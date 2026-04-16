@@ -5,7 +5,7 @@ from ast import FunctionDef, Module
 
 from .ast_utils import find_ann_assigns, find_name_uses_after, find_returns
 from .plan_data import FuncInfo, PlanData
-from .rules import EditName, body_policy_for, param_policy_for, return_policy_for
+from .rules import EditName, body_policy_for, expand_aliases, param_policy_for, return_policy_for
 from .tasks import (
     Arg,
     Detyper,
@@ -77,7 +77,7 @@ def generate_tasks_params_definition(
         if typ is None:
             continue
 
-        policy = param_policy_for(typ)
+        policy = param_policy_for(typ, plan.aliases)
         actions = policy.definition_edits
 
         if 'remove_annotation' in actions:
@@ -109,7 +109,7 @@ def generate_tasks_params_calls(
     for idx, typ in enumerate(info.param_types):
         if typ is None:
             continue
-        policy = param_policy_for(typ)
+        policy = param_policy_for(typ, plan.aliases)
         actions = policy.call_edits
 
         if 'preserve_argument_mutations' in actions:
@@ -145,8 +145,8 @@ def generate_tasks_body(
     result: list[Detyper] = []
 
     for ann in find_ann_assigns(node):
-        typ = ann.annotation
-        policy = body_policy_for(typ)
+        typ = expand_aliases(ann.annotation, plan.aliases)
+        policy = body_policy_for(typ, plan.aliases)
         actions = policy.annotation_edits
 
         if 'wrap_later_name_uses' in actions and ann.value is None and isinstance(ann.target, ast.Name):
@@ -173,7 +173,7 @@ def generate_tasks_return_definition(
         return []
 
     ret_typ = info.return_type
-    policy = return_policy_for(ret_typ)
+    policy = return_policy_for(ret_typ, plan.aliases)
     actions = policy.definition_edits
     result: list[Detyper] = []
 
@@ -196,7 +196,7 @@ def generate_tasks_return_calls(
         return []
 
     ret_typ = info.return_type
-    policy = return_policy_for(ret_typ)
+    policy = return_policy_for(ret_typ, plan.aliases)
     value_actions = policy.value_edits
     call_actions = policy.call_edits
     result: list[Detyper] = []
