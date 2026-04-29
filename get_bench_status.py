@@ -69,8 +69,8 @@ def write_artifact(source_path: Path, variant: tuple[bool, ...], output_dir: Pat
     return artifact_path
 
 
-def run_artifact(path: Path) -> None:
-    run_timed_python_artifact_detailed(path)
+def run_artifact(path: Path, skip_typecheck: bool = False) -> None:
+    run_timed_python_artifact_detailed(path, skip_typecheck=skip_typecheck)
 
 
 def check_generated_variant(benchmark: str, variant_name: str, tmp_root: Path, rng: random.Random) -> VariantStatus:
@@ -95,7 +95,7 @@ def check_untyped(benchmark: str) -> VariantStatus:
         return VariantStatus('missing', 'missing untyped/main.py')
 
     try:
-        run_artifact(resolve_benchmark_path(benchmark, variant='untyped'))
+        run_artifact(resolve_benchmark_path(benchmark, variant='untyped'), skip_typecheck=True)
     except Exception as exc:
         return VariantStatus('failed', str(exc).strip())
 

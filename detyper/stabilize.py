@@ -37,10 +37,11 @@ class StabilizedRun:
 def run_benchmark_script_detailed(
     script_path: Path,
     retries: int = DEFAULT_RUN_RETRIES,
+    skip_typecheck: bool = False,
 ) -> TimedRunResult:
     for attempt in range(retries + 1):
         try:
-            return run_timed_python_artifact_detailed(script_path)
+            return run_timed_python_artifact_detailed(script_path, skip_typecheck=skip_typecheck)
         except (OSError, RuntimeError):
             if attempt == retries:
                 raise
@@ -82,12 +83,13 @@ def run_until_stable(
     batch_size: int = DEFAULT_BATCH_SIZE,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
     tolerance: float = DEFAULT_TOLERANCE,
+    skip_typecheck: bool = False,
 ) -> StabilizedRun:
     runs: list[TimedRunResult] = []
 
     for batch_number in range(1, max_iterations + 2):
         for _ in range(batch_size):
-            runs.append(run_benchmark_script_detailed(script_path))
+            runs.append(run_benchmark_script_detailed(script_path, skip_typecheck=skip_typecheck))
 
         timings = [run.timing for run in runs]
         stdev = bootstrap_stdev(timings, rng)

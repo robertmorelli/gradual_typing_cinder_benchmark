@@ -66,6 +66,7 @@ class Artifact:
     proportion: float
     proportion_index: int
     proportion_hex_id: str
+    skip_typecheck: bool = False
 
 
 def timestamp() -> str:
@@ -108,7 +109,7 @@ def summarize(raw_rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return summary_rows
 
 
-def sample_variants(total: int, detyped: int, samples_per_proportion: int, rng: random.Random) -> list[tuple[bool, ...]]:
+def sample_variants(total: int, detyped: int, limit: int, rng: random.Random) -> list[tuple[bool, ...]]:
     if total == 0:
         return [tuple()]
     if detyped == 0:
@@ -116,7 +117,7 @@ def sample_variants(total: int, detyped: int, samples_per_proportion: int, rng: 
     if detyped == total:
         return [tuple(True for _ in range(total))]
 
-    sample_count = min(samples_per_proportion, math.comb(total, detyped))
+    sample_count = min(limit, math.comb(total, detyped))
     variants: list[tuple[bool, ...]] = []
     seen: set[tuple[bool, ...]] = set()
     while len(variants) < sample_count:
@@ -132,9 +133,8 @@ def write_variant_artifacts(
     benchmark: str,
     variant_name: str,
     experiment: Experiment,
-    samples_per_proportion: int,
+    limit: int,
     rng: random.Random,
-    artifact_limit: int | None,
 ) -> list[Artifact]:
     source_path = resolve_benchmark_path(benchmark, variant=variant_name)
     output_dir = experiment.files / benchmark / variant_name
@@ -145,11 +145,9 @@ def write_variant_artifacts(
     for detyped in range(total + 1):
         proportion = 0.0 if total == 0 else detyped / total
         for proportion_index, choices in enumerate(
-            sample_variants(total, detyped, samples_per_proportion, rng),
+            sample_variants(total, detyped, limit, rng),
             start=1,
         ):
-            if artifact_limit is not None and len(result) >= artifact_limit:
-                return result
             program = build_source_variant(artifacts, choices)
             artifact_path = output_dir / f'{artifacts.source_stem}_{program.perm_hex}_k{detyped:02d}_s{proportion_index:02d}.py'
             artifact_path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,13 +172,14 @@ def write_untyped_artifact(benchmark: str, experiment: Experiment) -> list[Artif
         proportion=1.0,
         proportion_index=1,
         proportion_hex_id='untyped',
+        skip_typecheck=True,
     )]
 
 
 def run_artifact(artifact: Artifact, rng: random.Random) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
 
-    stabilized = run_until_stable(artifact.path, rng)
+    stabilized = run_until_stable(artifact.path, rng, skip_typecheck=artifact.skip_typecheck)
     for index, run in enumerate(stabilized.runs):
         rows.append({
             'proportion': repr(artifact.proportion),
@@ -200,24 +199,22 @@ def artifacts_for_variant(
     benchmark: str,
     variant_name: str,
     experiment: Experiment,
-    samples_per_proportion: int,
+    limit: int,
     rng: random.Random,
-    artifact_limit: int | None,
 ) -> list[Artifact]:
     if variant_name == 'untyped':
         return write_untyped_artifact(benchmark, experiment)
-    return write_variant_artifacts(benchmark, variant_name, experiment, samples_per_proportion, rng, artifact_limit)
+    return write_variant_artifacts(benchmark, variant_name, experiment, limit, rng)
 
 
 def run_variant(
     benchmark: str,
     variant_name: str,
     experiment: Experiment,
-    samples_per_proportion: int,
+    limit: int,
     rng: random.Random,
-    remaining_limit: int | None,
 ) -> int:
-    artifacts = artifacts_for_variant(benchmark, variant_name, experiment, samples_per_proportion, rng, remaining_limit)
+    artifacts = artifacts_for_variant(benchmark, variant_name, experiment, limit, rng)
 
     print(f'{benchmark}/{variant_name}: running {len(artifacts)} artifacts', flush=True)
     raw_path = experiment.root / csv_name(benchmark, variant_name, 'raw')
@@ -238,28 +235,21 @@ def run_variant(
 def run_experiment(
     benchmarks: list[str],
     output_root: Path,
-    samples_per_proportion: int,
+    limit: int,
     seed: int,
-    limit: int | None,
 ) -> Experiment:
     experiment = new_experiment(output_root)
     rng = random.Random(seed)
-    remaining_limit = limit
 
     for benchmark in benchmarks:
         for variant_name in VARIANTS:
-            if remaining_limit == 0:
-                return experiment
             completed = run_variant(
                 benchmark,
                 variant_name,
                 experiment,
-                samples_per_proportion,
+                limit,
                 rng,
-                remaining_limit,
             )
-            if remaining_limit is not None:
-                remaining_limit -= completed
 
     return experiment
 
@@ -268,9 +258,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Run simple detyping proportion experiments')
     parser.add_argument('benchmarks', nargs='*', help='Benchmark names. Defaults to bench_status.csv all_green rows.')
     parser.add_argument('--output-root', type=Path, default=OUTPUT_ROOT)
-    parser.add_argument('--samples-per-proportion', type=int, default=1)
+    parser.add_argument('--limit', type=int, default=1, help="Per proportion limit")
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--limit', type=int, help='Maximum number of artifacts to run across the whole experiment')
     return parser.parse_args()
 
 
@@ -292,9 +281,8 @@ def main() -> None:
     experiment = run_experiment(
         benchmarks=benchmarks,
         output_root=args.output_root,
-        samples_per_proportion=args.samples_per_proportion,
-        seed=args.seed,
         limit=args.limit,
+        seed=args.seed,
     )
     print(f'Wrote {experiment.root}', flush=True)
 
