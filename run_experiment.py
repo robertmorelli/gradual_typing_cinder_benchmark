@@ -16,12 +16,8 @@ from pathlib import Path
 from detyper.artifacts import build_source_variant, load_source_artifacts
 from detyper.benchmark_harness import resolve_benchmark_path
 from detyper.stabilize import (
-    BOOTSTRAP_RESAMPLES,
-    DEFAULT_ALPHA,
     DEFAULT_BATCH_SIZE,
-    DEFAULT_MAX_ITERATIONS,
-    DEFAULT_TOLERANCE,
-    run_benchmark_script_detailed,
+    run_until_stable,
 )
 
 OUTPUT_ROOT = Path('benchmark_results')
@@ -181,43 +177,21 @@ def write_untyped_artifact(benchmark: str, experiment: Experiment) -> list[Artif
     )]
 
 
-def bootstrap_interval(timings: list[float]) -> tuple[float, float]:
-    means = sorted(
-        statistics.fmean(random.choices(timings, k=len(timings)))
-        for _ in range(BOOTSTRAP_RESAMPLES)
-    )
-    lower = int((DEFAULT_ALPHA / 2) * len(means))
-    upper = int((1 - DEFAULT_ALPHA / 2) * len(means)) - 1
-    return means[max(0, lower)], means[min(len(means) - 1, upper)]
-
-
-def has_converged(timings: list[float]) -> bool:
-    mean = statistics.fmean(timings)
-    margin = abs(mean * DEFAULT_TOLERANCE)
-    ci_lower, ci_upper = bootstrap_interval(timings)
-    return (mean - margin) <= ci_lower and ci_upper <= (mean + margin)
-
-
-def run_artifact(artifact: Artifact) -> list[dict[str, object]]:
+def run_artifact(artifact: Artifact, rng: random.Random) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    timings: list[float] = []
 
-    for batch_number in range(1, DEFAULT_MAX_ITERATIONS + 2):
-        for batch_index in range(1, DEFAULT_BATCH_SIZE + 1):
-            run = run_benchmark_script_detailed(artifact.path)
-            timings.append(run.timing)
-            rows.append({
-                'proportion': repr(artifact.proportion),
-                'proportion_index': artifact.proportion_index,
-                'proportion_hex_id': artifact.proportion_hex_id,
-                'batch_number': batch_number,
-                'batch_index': batch_index,
-                'run_length': repr(run.timing),
-                'stdout': run.result.stdout,
-                'stderr': run.result.stderr,
-            })
-        if has_converged(timings):
-            break
+    stabilized = run_until_stable(artifact.path, rng)
+    for index, run in enumerate(stabilized.runs):
+        rows.append({
+            'proportion': repr(artifact.proportion),
+            'proportion_index': artifact.proportion_index,
+            'proportion_hex_id': artifact.proportion_hex_id,
+            'batch_number': index // DEFAULT_BATCH_SIZE + 1,
+            'batch_index': index % DEFAULT_BATCH_SIZE + 1,
+            'run_length': repr(run.timing),
+            'stdout': run.result.stdout,
+            'stderr': run.result.stderr,
+        })
 
     return rows
 
@@ -254,7 +228,7 @@ def run_variant(
 
     for artifact_index, artifact in enumerate(artifacts, start=1):
         print(f'  {artifact_index}/{len(artifacts)} {artifact.path.name}', flush=True)
-        raw_rows.extend(run_artifact(artifact))
+        raw_rows.extend(run_artifact(artifact, rng))
         write_csv(raw_path, RAW_FIELDS, raw_rows)
         write_csv(summary_path, SUMMARY_FIELDS, summarize(raw_rows))
 

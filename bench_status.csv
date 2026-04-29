@@ -1,0 +1,694 @@
+benchmark,category,advanced_status,advanced_error,shallow_status,shallow_error,untyped_status,untyped_error
+Benchmarks_Recreate_Paper_Results,missing_variants,missing,missing advanced/main.py,missing,missing shallow/main.py,missing,missing untyped/main.py
+call_method,all_green,ok,,ok,,ok,
+call_method_slots,all_green,ok,,ok,,ok,
+call_simple,all_green,ok,,ok,,ok,
+chaos,all_green,ok,,ok,,ok,
+deltablue,shallow_and_untyped_failures,ok,,failed,"artifact main_0x4bef050c3 failed (exit 137):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt",failed,"artifact main failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 8224, in _generic_bind
+    ret_types.append(callback(el, result_types))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 8236, in cb
+    el.instance.bind_attr(node, visitor, type_ctx)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 2438, in bind_attr
+    visitor.syntax_error(f""'NoneType' object has no attribute '{node.attr}'"", node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 74, in syntax_error
+    return self.error_sink.syntax_error(msg, self.filename, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 52, in syntax_error
+    self.error(TypedSyntaxError(msg, (filename, lineno, offset, source_line)))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 48, in error
+    raise exception
+  File ""static-python-perf/Benchmark/deltablue/untyped/main.py"", line 593
+    first.value = i
+cinderx.compiler.errors.TypedSyntaxError: 'NoneType' object has no attribute 'value'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 535, in code_gen
+    tree, s = self._bind(name, filename, tree, optimize, enable_patching)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 509, in _bind
+    type_binder.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 458, in visitModule
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 628, in visitFunctionDef
+    self._visitFunc(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 616, in _visitFunc
+    func.bind_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3136, in bind_function
+    terminates = visitor.visit_check_terminal(self.get_function_body())
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1970, in visitWhile
+    terminal_level = self.visit_check_terminal(node.body)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 859, in visitAssign
+    self.visit(target)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1522, in visitAttribute
+    base.bind_attr(node, self, type_ctx)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 8239, in bind_attr
+    self._generic_bind(node, cb, ""access attribute from"", visitor, type_ctx)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 8226, in _generic_bind
+    visitor.syntax_error(f""{self.name}: {e.msg}"", node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 74, in syntax_error
+    return self.error_sink.syntax_error(msg, self.filename, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 52, in syntax_error
+    self.error(TypedSyntaxError(msg, (filename, lineno, offset, source_line)))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 48, in error
+    raise exception
+  File ""static-python-perf/Benchmark/deltablue/untyped/main.py"", line 593
+    first.value = i
+cinderx.compiler.errors.TypedSyntaxError: Optional[__main__.Variable]: 'NoneType' object has no attribute 'value'"
+django,missing_variants,missing,missing advanced/main.py,missing,missing shallow/main.py,missing,missing untyped/main.py
+django_sample,missing_variants,missing,missing advanced/main.py,missing,missing shallow/main.py,missing,missing untyped/main.py
+espionage,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/espionage/advanced/main_0x0.py"", line 3, in <module>
+    from union_find import UnionFind
+ModuleNotFoundError: No module named 'union_find'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/espionage/shallow/main_0x0.py"", line 3, in <module>
+    from union_find import UnionFind
+ModuleNotFoundError: No module named 'union_find'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/espionage/untyped/main.py"", line 82, in <module>
+    with open(fname, ""r"") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '../us-input.txt'"
+evolution,advanced_and_shallow_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/evolution/advanced/main_0x0.py"", line 2, in <module>
+    from evolution.player.player import Player
+ModuleNotFoundError: No module named 'evolution'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/evolution/shallow/main_0x0.py"", line 2, in <module>
+    from evolution.player.player import Player
+ModuleNotFoundError: No module named 'evolution'",ok,
+fannkuch,all_green,ok,,ok,,ok,
+float,all_green,ok,,ok,,ok,
+futen,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/futen/advanced/main_0x0.py"", line 2, in <module>
+    from futen import get_netlocs, execute
+ModuleNotFoundError: No module named 'futen'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/futen/shallow/main_0x0.py"", line 2, in <module>
+    from futen import get_netlocs, execute
+ModuleNotFoundError: No module named 'futen'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/futen/untyped/main.py"", line 33, in <module>
+    main(1900)
+  File ""/app/static-python-perf/Benchmark/futen/untyped/main.py"", line 9, in main
+    with open(testfile) as fd:
+FileNotFoundError: [Errno 2] No such file or directory: '../ssh.config.dat'"
+go,advanced_and_shallow_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 427, in <module>
+    pos = computer_move(board)
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 416, in computer_move
+    node.play(nboard)
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 329, in play
+    self.random_playout(board)
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 350, in random_playout
+    board.move(board.random_move())
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 186, in move
+    self.emptyset.remove(square.pos, True)
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 122, in remove
+    self.set(self.empty_pos[pos], self.empties[len(self.empties) - 1])
+  File ""/app/.bench-status-a3vpno6d/go/advanced/main_0x0.py"", line 125, in set
+    self.empties[i] = int64(pos)
+IndexError: list assignment index out of range",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/go/shallow/main_0x0.py"", line 4, in <module>
+    from square import Square
+ModuleNotFoundError: No module named 'square'",ok,
+held_karp,missing_variants,ok,,missing,missing shallow/main.py,missing,missing untyped/main.py
+http2,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/http2/advanced/main_0x0.py"", line 1, in <module>
+    from iri2uri import Iri2Uri
+ModuleNotFoundError: No module named 'iri2uri'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/http2/shallow/main_0x0.py"", line 1, in <module>
+    from iri2uri import Iri2Uri
+ModuleNotFoundError: No module named 'iri2uri'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/http2/untyped/main.py"", line 54, in <module>
+    main()
+  File ""/app/static-python-perf/Benchmark/http2/untyped/main.py"", line 44, in main
+    with open(testfile) as fd:
+FileNotFoundError: [Errno 2] No such file or directory: '../sample_urls.csv'"
+meteor,advanced_failures,failed,"artifact main_0x0 failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 535, in code_gen
+    tree, s = self._bind(name, filename, tree, optimize, enable_patching)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 509, in _bind
+    type_binder.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 458, in visitModule
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 628, in visitFunctionDef
+    self._visitFunc(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 616, in _visitFunc
+    func.bind_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3136, in bind_function
+    terminates = visitor.visit_check_terminal(self.get_function_body())
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1715, in visitReturn
+    self.visit(value, expected)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1240, in visitListComp
+    self.visit_comprehension(node, node.generators, node.elt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1381, in visit_comprehension
+    self.visitExpectedType(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1653, in visitExpectedType
+    res = self.visit(node, expected)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1577, in visitSubscript
+    val_type.bind_subscr(node, self.get_type(node.slice), self, type_ctx)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 912, in bind_subscr
+    visitor.check_can_assign_from(visitor.type_env.dynamic, type.klass, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 909, in check_can_assign_from
+    self.syntax_error(reason, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 74, in syntax_error
+    return self.error_sink.syntax_error(msg, self.filename, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 52, in syntax_error
+    self.error(TypedSyntaxError(msg, (filename, lineno, offset, source_line)))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 48, in error
+    raise exception
+  File "".bench-status-a3vpno6d/meteor/advanced/main_0x0.py"", line 32
+    return [rd[o] for o in ido]
+           ^
+cinderx.compiler.errors.TypedSyntaxError: type mismatch: int64 cannot be assigned to dynamic",ok,,ok,
+nbody,shallow_and_untyped_failures,ok,,failed,"artifact main_0x1a failed (exit 1):
+docker error: exec create: Error response from daemon: container fda33510ad5296f750f5ab5312b8f6539aff80df76bbba176afa8fd56debbefe is not running",failed,"artifact main failed (exit 1):
+docker error: container create: Error response from daemon: Conflict. The container name ""/cinder-env-daemon"" is already in use by container ""aa12a514df7579d0533f88a9ec6fa491c4152de2d80f75f2f69692aec55bf2cf"". You have to remove (or rename) that container to be able to reuse that name."
+nqueens,advanced_failures,failed,"artifact main_0x0 failed (exit 1):
+docker error: container create: Error response from daemon: Conflict. The container name ""/cinder-env-daemon"" is already in use by container ""aa12a514df7579d0533f88a9ec6fa491c4152de2d80f75f2f69692aec55bf2cf"". You have to remove (or rename) that container to be able to reuse that name.",ok,,ok,
+pidigits,advanced_failures,failed,"artifact main_0x0 failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 535, in code_gen
+    tree, s = self._bind(name, filename, tree, optimize, enable_patching)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 509, in _bind
+    type_binder.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 458, in visitModule
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 628, in visitFunctionDef
+    self._visitFunc(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 616, in _visitFunc
+    func.bind_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3136, in bind_function
+    terminates = visitor.visit_check_terminal(self.get_function_body())
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 856, in visitAssign
+    self.visit(target)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1681, in visitTuple
+    self.visitExpectedType(elt, self.type_env.DYNAMIC)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1654, in visitExpectedType
+    self.check_can_assign_from(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 909, in check_can_assign_from
+    self.syntax_error(reason, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 74, in syntax_error
+    return self.error_sink.syntax_error(msg, self.filename, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 52, in syntax_error
+    self.error(TypedSyntaxError(msg, (filename, lineno, offset, source_line)))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 48, in error
+    raise exception
+  File "".bench-status-a3vpno6d/pidigits/advanced/main_0x0.py"", line 28
+    q, r, s, t = CheckedList[int64](z)
+cinderx.compiler.errors.TypedSyntaxError: type mismatch: int64 cannot be assigned to dynamic",ok,,ok,
+pystone,untyped_failures,ok,,ok,,failed,"artifact main failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 535, in code_gen
+    tree, s = self._bind(name, filename, tree, optimize, enable_patching)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 509, in _bind
+    type_binder.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 458, in visitModule
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 628, in visitFunctionDef
+    self._visitFunc(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 616, in _visitFunc
+    func.bind_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3136, in bind_function
+    terminates = visitor.visit_check_terminal(self.get_function_body())
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 871, in visitAssign
+    self.assign_value(target, value_type, src=node.value, assignment=node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1285, in assign_value
+    self.assign_name(target, target.id, value)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1272, in assign_name
+    self.check_can_assign_from(decl_type.type.klass, value.klass, target)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 909, in check_can_assign_from
+    self.syntax_error(reason, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 74, in syntax_error
+    return self.error_sink.syntax_error(msg, self.filename, node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 52, in syntax_error
+    self.error(TypedSyntaxError(msg, (filename, lineno, offset, source_line)))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/errors.py"", line 48, in error
+    raise exception
+  File ""static-python-perf/Benchmark/pystone/untyped/main.py"", line 98
+    PtrGlbNext = Record()
+cinderx.compiler.errors.TypedSyntaxError: type mismatch: __main__.Record cannot be assigned to None"
+pythonflow,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 535, in code_gen
+    tree, s = self._bind(name, filename, tree, optimize, enable_patching)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 509, in _bind
+    type_binder.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 458, in visitModule
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 668, in visitClassDef
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 628, in visitFunctionDef
+    self._visitFunc(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 616, in _visitFunc
+    func.bind_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3136, in bind_function
+    terminates = visitor.visit_check_terminal(self.get_function_body())
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1816, in visitIf
+    terminates = self.visit_check_terminal(node.body)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1787, in visit_check_terminal
+    self.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 394, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/visitor.py"", line 71, in visit
+    return super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 2003, in visitFor
+    self.iterate_to_fixed_point(node.body)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 1948, in iterate_to_fixed_point
+    branch.merge()
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 243, in merge
+    local_types[key] = self._join(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/type_binder.py"", line 294, in _join
+    return self.type_env.get_union(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 678, in get_union
+    return self.get_generic_type(self.union, index)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 625, in get_generic_type
+    concrete = generic_type.make_generic_type(index)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 8172, in make_generic_type
+    raise TypedSyntaxError(
+  File "".bench-status-a3vpno6d/pythonflow/advanced/main_0x0.py"", line 85
+    for x in range(len(self.options)):
+cinderx.compiler.errors.TypedSyntaxError: invalid union type Union[int64, Literal[0]]; unions cannot include primitive types",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/pythonflow/shallow/main_0x0.py"", line 130, in <module>
+    flow = PythonFlow()
+  File ""/app/.bench-status-a3vpno6d/pythonflow/shallow/main_0x0.py"", line 23, in __init__
+    self.load_file()
+  File ""/app/.bench-status-a3vpno6d/pythonflow/shallow/main_0x0.py"", line 32, in load_file
+    for line in open(self.file_name):
+FileNotFoundError: [Errno 2] No such file or directory: 'graph2.txt'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/pythonflow/untyped/main.py"", line 187, in <module>
+    flow = PythonFlow()
+  File ""/app/static-python-perf/Benchmark/pythonflow/untyped/main.py"", line 52, in __init__
+    self.load_file()
+  File ""/app/static-python-perf/Benchmark/pythonflow/untyped/main.py"", line 63, in load_file
+    for line in open(self.file_name):
+FileNotFoundError: [Errno 2] No such file or directory: 'graph2.txt'"
+richards,all_green,ok,,ok,,ok,
+sample_fsm,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/sample_fsm/advanced/main_0x0.py"", line 1, in <module>
+    from Population import Population
+ModuleNotFoundError: No module named 'Population'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/sample_fsm/shallow/main_0x0.py"", line 1, in <module>
+    from Population import Population
+ModuleNotFoundError: No module named 'Population'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/sample_fsm/untyped/main.py"", line 3, in <module>
+    from Utilities import relative_average
+  File ""/app/static-python-perf/Benchmark/sample_fsm/untyped/Utilities.py"", line 4, in <module>
+    rand_num = itertools.cycle((float(line.strip()) for line in open(fname, ""r"")))
+FileNotFoundError: [Errno 2] No such file or directory: 'util-random-numbers.txt'"
+slowsha,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/slowsha/advanced/main_0x0.py"", line 3, in <module>
+    from sha1 import SHA1
+ModuleNotFoundError: No module named 'sha1'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/slowsha/shallow/main_0x0.py"", line 3, in <module>
+    from sha1 import SHA1
+ModuleNotFoundError: No module named 'sha1'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/slowsha/untyped/main.py"", line 91, in <module>
+    main()
+  File ""/app/static-python-perf/Benchmark/slowsha/untyped/main.py"", line 80, in main
+    with open(""../mysterious_words.txt"", ""rb"") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '../mysterious_words.txt'"
+spectralnorm,advanced_and_shallow_failures,failed,"artifact main_0x0 failed (exit 1):
+Traceback (most recent call last):
+  File ""/cinder/Lib/runpy.py"", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File ""/cinder/Lib/runpy.py"", line 86, in _run_code
+    exec(code, run_globals)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/__main__.py"", line 82, in <module>
+    codeobj = pycodegen.compile(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 131, in compile
+    result = make_compiler(source, filename, mode, flags, optimize, compiler, modname)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 172, in make_compiler
+    return generator.make_code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 301, in make_code_gen
+    code_gen = compiler.code_gen(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/compiler.py"", line 559, in code_gen
+    code_gen.visit(tree)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 597, in visitModule
+    super().visitModule(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 430, in visitModule
+    self.visitStatements(self.skip_docstring(node.body))
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3009, in visitStatements
+    self.visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/strict/__init__.py"", line 305, in visitFunctionDef
+    super().visitFunctionDef(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 452, in visitFunctionDef
+    self.visitFunctionOrLambda(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 430, in visitFunctionOrLambda
+    name = function.emit_function(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3679, in emit_function
+    self.emit_function_body(node, code_gen, first_lineno, node.body)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 3232, in emit_function_body
+    code_gen.processBody(node, body, gen)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 421, in processBody
+    super().processBody(node, body, gen)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/strict/__init__.py"", line 569, in processBody
+    super().processBody(node, body, gen)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 495, in processBody
+    gen.visit(stmt)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 865, in visitReturn
+    self._visitReturnValue(value, expected)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 847, in _visitReturnValue
+    self.visit(value)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 986, in visitListComp
+    return super().visitListComp(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 1058, in visitListComp
+    self.compile_comprehension(
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3090, in compile_comprehension
+    self.visit(node.generators[0].iter)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 839, in visitCall
+    self.get_type(node.func).emit_call(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 1775, in emit_call
+    return super().emit_call(node, code_gen)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 955, in emit_call
+    code_gen.defaultVisit(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 1092, in defaultVisit
+    return meth(self, node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/strict/__init__.py"", line 266, in visitCall
+    super().visitCall(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3164, in visitCall
+    return super().visitCall(node)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 1838, in visitCall
+    self._call_helper(0, node, node.args, node.keywords)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 1788, in _call_helper
+    return self._fastcall_helper(argcnt, node, args, kwargs)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 1775, in _fastcall_helper
+    self.visit(arg)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/pycodegen.py"", line 3000, in visit
+    ret = super().visit(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/visitor.py"", line 70, in visit
+    return meth(node, *args)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 839, in visitCall
+    self.get_type(node.func).emit_call(node, self)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 6740, in emit_call
+    code_gen.get_type(node.args[0]).emit_len(node, code_gen, boxed=self.boxed)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 1172, in emit_len
+    return self.emit_call(node, code_gen)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/types.py"", line 1772, in emit_call
+    call_info = code_gen.get_node_data(node, ClassCallInfo)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/__init__.py"", line 278, in get_node_data
+    return self.cur_mod.get_node_data(key, data_type)
+  File ""/cinder/cinderx/PythonLib/cinderx/compiler/static/module_table.py"", line 566, in get_node_data
+    return cast(TType, self.node_data[key, data_type])
+KeyError: (<ast.Call object at 0x7ffffc636e30>, <class 'cinderx.compiler.static.types.ClassCallInfo'>)",failed,"artifact main_0x1f failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/spectralnorm/shallow/main_0x1f.py"", line 37, in <module>
+    v = eval_AtA_times_u(u)
+  File ""/app/.bench-status-a3vpno6d/spectralnorm/shallow/main_0x1f.py"", line 17, in eval_AtA_times_u
+    return eval_times_u(cast(Function[[Tuple[float, List[float]]], float], part_At_times_u), eval_times_u(cast(Function[[Tuple[float, List[float]]], float], part_A_times_u), u))
+  File ""/cinder/cinderx/PythonLib/__static__/__init__.py"", line 412, in cast
+    raise TypeError(f""expected {typ.__name__}, got {type(val).__name__}"")
+TypeError: expected Callable, got function",ok,
+stats,advanced_and_shallow_and_untyped_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/stats/advanced/main_0x0.py"", line 2, in <module>
+    import anova
+ModuleNotFoundError: No module named 'anova'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/stats/shallow/main_0x0.py"", line 2, in <module>
+    import anova
+ModuleNotFoundError: No module named 'anova'",failed,"artifact main failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/static-python-perf/Benchmark/stats/untyped/main.py"", line 3, in <module>
+    import correlation
+  File ""/app/static-python-perf/Benchmark/stats/untyped/correlation.py"", line 13, in <module>
+    def pearsonr(x: List(float), y: List(float)) -> (float, float):
+NameError: name 'List' is not defined. Did you mean: 'list'?"
+take5,advanced_and_shallow_failures,failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/take5/advanced/main_0x0.py"", line 1, in <module>
+    from player import Player
+ModuleNotFoundError: No module named 'player'",failed,"artifact main_0x0 failed (exit 1):
+JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+Traceback (most recent call last):
+  File ""/app/.bench-status-a3vpno6d/take5/shallow/main_0x0.py"", line 1, in <module>
+    from player import Player
+ModuleNotFoundError: No module named 'player'",ok,
+wagtail,missing_variants,missing,missing advanced/main.py,missing,missing shallow/main.py,missing,missing untyped/main.py
+zulip,missing_variants,missing,missing advanced/main.py,missing,missing shallow/main.py,missing,missing untyped/main.py
