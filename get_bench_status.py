@@ -122,7 +122,6 @@ def _sample_variants(n: int, rng: random.Random) -> list[tuple[int, tuple[bool, 
     if len(deduped) <= SHALLOW_MAX_TOTAL_SAMPLES:
         return deduped
 
-    # Keep endpoints and spread the rest deterministically.
     trimmed = [deduped[0], deduped[-1]]
     middle = deduped[1:-1]
     needed = max(0, SHALLOW_MAX_TOTAL_SAMPLES - len(trimmed))

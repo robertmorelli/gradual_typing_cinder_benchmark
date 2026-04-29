@@ -61,8 +61,6 @@ def _wrap_args_for(actions: tuple[EditName, ...], typ: ast.expr | None) -> list[
     return wrap_args
 
 
-# ── params: definition edits ────────────────────────────────────────────────
-
 def generate_tasks_params_definition(
     node: FunctionDef,
     plan: PlanData,
@@ -90,12 +88,10 @@ def generate_tasks_params_definition(
     return result
 
 
-# ── params: call edits ───────────────────────────────────────────────────────
-
 def generate_tasks_params_calls(
     node: FunctionDef,
     plan: PlanData,
-    func_uses: list,    # list of (call_node, caller_funcdef)
+    func_uses: list[CallSite],
     method_uses: list,
     module: Module,
 ) -> list[Detyper]:
@@ -133,8 +129,6 @@ def generate_tasks_params_calls(
     return result
 
 
-# ── generate_tasks_body ──────────────────────────────────────────────────────
-
 def generate_tasks_body(
     node: FunctionDef,
     plan: PlanData,
@@ -162,8 +156,6 @@ def generate_tasks_body(
     return result
 
 
-# ── return: definition edits ────────────────────────────────────────────────
-
 def generate_tasks_return_definition(
     node: FunctionDef,
     plan: PlanData,
@@ -183,12 +175,10 @@ def generate_tasks_return_definition(
     return result
 
 
-# ── return: call edits ───────────────────────────────────────────────────────
-
 def generate_tasks_return_calls(
     node: FunctionDef,
     plan: PlanData,
-    func_uses: list,    # list of (call_node, caller_funcdef)
+    func_uses: list[CallSite],
     method_uses: list,
 ) -> list[Detyper]:
     info = _detyped_info(node, plan)

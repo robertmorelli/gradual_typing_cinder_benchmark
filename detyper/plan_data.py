@@ -6,7 +6,7 @@ from ast import FunctionDef, Module
 
 from .rules import expand_aliases, resolve_annotation
 
-TypeSpec = ast.expr  # alias for clarity
+TypeSpec = ast.expr
 
 
 @dataclass(frozen=True)
@@ -135,13 +135,12 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             for a in base_params
         ]
         return_type: TypeSpec | None = expand_aliases(resolve_annotation(base.returns), aliases)
-        param_locked = [False] * n   # True once a conflict forces slot to None
-        return_locked = False        # True once a conflict forces return_type to None
+        param_locked = [False] * n
+        return_locked = False
 
         for fdef in fdefs[1:]:
             fargs = fdef.args.args
             if len(fargs) != n:
-                # Arity mismatch — clear everything; call-site wrapping is unsafe
                 param_types = [None] * n
                 return_type = None
                 break
