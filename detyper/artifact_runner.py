@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,25 +27,30 @@ class TimedRunResult:
     result: RunResult
 
 
-def _artifact_python_executable() -> str:
-    cinder_python = os.environ.get('CINDER_PYTHON')
-    if cinder_python:
-        return cinder_python
-
+def _cinder_activate_script() -> Path:
     cinder_env = os.environ.get('CINDER_ENV')
     if cinder_env:
-        candidate = Path(cinder_env) / 'bin' / 'python'
+        candidate = Path(cinder_env) / 'bin' / 'activate'
         if candidate.exists():
-            return str(candidate)
+            return candidate
 
-    local_candidate = Path('cinder_env/bin/python')
+    local_candidate = Path('cinder_env/bin/activate')
     if local_candidate.exists():
-        return str(local_candidate)
+        return local_candidate
 
     raise RuntimeError(
-        'Could not find the Cinder Python runtime. Set CINDER_PYTHON or CINDER_ENV, '
-        'or run setup so cinder_env/bin/python exists.'
+        'Could not find the Cinder environment. Set CINDER_ENV or run setup so '
+        'cinder_env/bin/activate exists.'
     )
+
+
+def _activated_shell_command(command: list[str]) -> list[str]:
+    activate_script = _cinder_activate_script()
+    shell_command = (
+        f'source {shlex.quote(str(activate_script))} && '
+        + ' '.join(shlex.quote(part) for part in command)
+    )
+    return ['bash', '-lc', shell_command]
 
 
 def run_python_artifact(
@@ -52,13 +58,13 @@ def run_python_artifact(
     label: str | None = None,
     skip_typecheck: bool = False,
 ) -> RunResult:
-    command = [_artifact_python_executable()]
+    command = ['python']
     if skip_typecheck:
         command.append('--skip-typecheck')
     command.append(str(artifact_path))
 
     proc = subprocess.run(
-        command,
+        _activated_shell_command(command),
         capture_output=True,
         text=True,
     )
@@ -100,7 +106,7 @@ def should_reset_cinder_daemon(result: RunResult) -> bool:
 
 def reset_cinder_daemon() -> None:
     subprocess.run(
-        ['docker', 'rm', '-f', CINDER_DAEMON_NAME],
+        _activated_shell_command(['docker', 'rm', '-f', CINDER_DAEMON_NAME]),
         capture_output=True,
         text=True,
     )
@@ -158,12 +164,12 @@ def run_typecheck_python_artifact(
     label: str | None = None,
 ) -> RunResult:
     command = [
-        _artifact_python_executable(),
+        'python',
         '--typecheck-only',
         str(artifact_path),
     ]
     proc = subprocess.run(
-        command,
+        _activated_shell_command(command),
         capture_output=True,
         text=True,
     )
