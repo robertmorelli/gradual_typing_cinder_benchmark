@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-sudo apt-get upgrade
-sudo apt-get install -y libz-dev
+# sudo apt-get upgrade
+# sudo apt-get install -y libz-dev
 
 # Add Docker's official GPG key:
 sudo apt-get update
