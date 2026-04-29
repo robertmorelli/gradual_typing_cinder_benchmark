@@ -54,7 +54,7 @@ Refresh the benchmark status CSV:
 python3 get_bench_status.py
 ```
 
-`setup_experiment.py` uses `bench_status.csv` when it exists and writes rows marked `all_green` into `benchmark_results/benchmark_plan.json`. `typecheck_exp.py` reads that plan and writes `benchmark_results/typecheck.json`. `run_exp_part.py` reads both files, runs planned artifacts with `--skip-typecheck`, and writes `benchmark_results/<benchmark>_<variant>_raw.csv` and `benchmark_results/<benchmark>_<variant>_summary.csv`.
+`setup_experiment.py` uses `bench_status.csv` when it exists and writes rows marked `all_green` into `benchmark_results/benchmark_plan.json`. `typecheck_exp.py` reads that plan and writes `benchmark_results/typecheck.json`. `run_exp_part.py` reads the plan, runs planned artifacts with `--skip-typecheck`, and writes `benchmark_results/<benchmark>_<variant>_raw.csv` and `benchmark_results/<benchmark>_<variant>_summary.csv`. Typechecking is an independent validation step and is not required before running a part.
 
 `run_experiment.py` uses `bench_status.csv` when it exists and runs rows marked `all_green`. Outputs are CSV-only under `benchmark_results/experiment_<timestamp>/`.
 

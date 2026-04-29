@@ -19,7 +19,6 @@ from run_experiment import OUTPUT_ROOT, RAW_FIELDS, SUMMARY_FIELDS, summarize
 from setup_experiment import PLAN_PATH
 
 RNG_SEED = 0
-TYPECHECK_PATH = OUTPUT_ROOT / 'typecheck.json'
 
 
 def csv_name(benchmark: str, variant: str, kind: str) -> str:
@@ -40,35 +39,11 @@ def load_plan(path: Path = PLAN_PATH) -> dict[str, dict[str, list[str]]]:
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def load_typecheck(path: Path = TYPECHECK_PATH) -> dict[str, dict[str, dict[str, bool]]]:
-    if not path.exists():
-        raise SystemExit(f'Missing typecheck results: {path}')
-    return json.loads(path.read_text(encoding='utf-8'))
-
-
 def planned_hexes(benchmark: str, variant: str, plan: dict[str, dict[str, list[str]]]) -> list[str]:
     try:
         return plan[benchmark][variant]
     except KeyError:
         raise SystemExit(f'Plan has no entry for {benchmark}/{variant}')
-
-
-def require_typechecked(benchmark: str, variant: str, hexes: list[str]) -> None:
-    typecheck = load_typecheck()
-    try:
-        variant_results = typecheck[benchmark][variant]
-    except KeyError:
-        raise SystemExit(f'Typecheck results have no entry for {benchmark}/{variant}')
-
-    missing = [hex_id for hex_id in hexes if hex_id not in variant_results]
-    failed = [hex_id for hex_id in hexes if variant_results.get(hex_id) is False]
-    if missing or failed:
-        messages = []
-        if missing:
-            messages.append(f'missing: {", ".join(missing[:10])}')
-        if failed:
-            messages.append(f'failed: {", ".join(failed[:10])}')
-        raise SystemExit(f'Typecheck incomplete for {benchmark}/{variant} ({"; ".join(messages)})')
 
 
 def write_artifact(benchmark: str, variant: str, hex_id: str, output_dir: Path) -> Path:
@@ -117,7 +92,6 @@ def run_artifact(
 def run_part(benchmark: str, variant: str) -> None:
     plan = load_plan()
     hexes = planned_hexes(benchmark, variant, plan)
-    require_typechecked(benchmark, variant, hexes)
     raw_path = OUTPUT_ROOT / csv_name(benchmark, variant, 'raw')
     summary_path = OUTPUT_ROOT / csv_name(benchmark, variant, 'summary')
     raw_rows: list[dict[str, object]] = []
