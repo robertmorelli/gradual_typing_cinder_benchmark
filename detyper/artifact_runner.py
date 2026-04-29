@@ -151,3 +151,28 @@ def run_timed_python_artifact_detailed(
         return TimedRunResult(timing=timing, result=result)
 
     raise AssertionError('unreachable')
+
+
+def run_typecheck_python_artifact(
+    artifact_path: Path,
+    label: str | None = None,
+) -> RunResult:
+    command = [
+        _artifact_python_executable(),
+        '--typecheck-only',
+        str(artifact_path),
+    ]
+    proc = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+    )
+    result = RunResult(
+        label=label or artifact_path.stem,
+        file=str(artifact_path),
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+    )
+    raise_for_failed_run(result)
+    return result

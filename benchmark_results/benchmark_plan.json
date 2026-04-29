@@ -1,0 +1,15 @@
+{
+  "fannkuch": {
+    "advanced": [
+      "0x0",
+      "0x1"
+    ],
+    "shallow": [
+      "0x0",
+      "0x1"
+    ],
+    "untyped": [
+      "untyped"
+    ]
+  }
+}
