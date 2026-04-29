@@ -5,8 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from artifact_runner import RunResult, run_python_artifact
-
 BENCHMARK_ROOT = Path('static-python-perf/Benchmark')
 
 
@@ -29,7 +27,3 @@ def benchmark_output_dir(source_path: Path) -> Path:
     except (ValueError, TypeError):
         relative = Path(source_path.parent.name)
     return Path('detyped_files') / relative
-
-
-def run_prepared_artifact(artifact_path: Path, label: str) -> RunResult:
-    return run_python_artifact(artifact_path, label=label)

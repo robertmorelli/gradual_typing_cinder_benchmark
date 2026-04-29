@@ -1,4 +1,7 @@
 detyped_files/*
+benchmark_results/experiment_*/
+bench_status.csv
+.bench-status-*/
 __pycache__
 *.pyc
 .claude/

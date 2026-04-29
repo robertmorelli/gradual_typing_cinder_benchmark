@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from benchmark_harness import resolve_benchmark_path
 from detyper.artifacts import build_source_variant, load_source_artifacts
-from stabalize import (
+from detyper.benchmark_harness import resolve_benchmark_path
+from detyper.stabilize import (
     BOOTSTRAP_RESAMPLES,
     DEFAULT_ALPHA,
     DEFAULT_BATCH_SIZE,
@@ -24,9 +24,22 @@ from stabalize import (
     run_benchmark_script_detailed,
 )
 
-BENCH_STATUS = Path('bench_status.md')
 OUTPUT_ROOT = Path('benchmark_results')
+BENCH_STATUS = Path('bench_status.csv')
 VARIANTS = ('advanced', 'shallow', 'untyped')
+DEFAULT_BENCHMARKS = [
+    'call_method',
+    'call_method_slots',
+    'call_simple',
+    'chaos',
+    'deltablue',
+    'fannkuch',
+    'float',
+    'nbody',
+    'nqueens',
+    'pystone',
+    'richards',
+]
 RAW_FIELDS = [
     'proportion',
     'proportion_index',
@@ -34,6 +47,8 @@ RAW_FIELDS = [
     'batch_number',
     'batch_index',
     'run_length',
+    'stdout',
+    'stderr',
 ]
 SUMMARY_FIELDS = [
     'proportion',
@@ -55,22 +70,6 @@ class Artifact:
     proportion: float
     proportion_index: int
     proportion_hex_id: str
-
-
-def benchmarks_from_status() -> list[str]:
-    benchmarks: list[str] = []
-    in_green_section = False
-
-    for line in BENCH_STATUS.read_text(encoding='utf-8').splitlines():
-        if line in {'## Detyping works', '### All green'}:
-            in_green_section = True
-            continue
-        if in_green_section and line.startswith(('## ', '### ')):
-            break
-        if in_green_section and line.startswith('- '):
-            benchmarks.append(line[2:].strip())
-
-    return benchmarks
 
 
 def timestamp() -> str:
@@ -205,15 +204,17 @@ def run_artifact(artifact: Artifact) -> list[dict[str, object]]:
 
     for batch_number in range(1, DEFAULT_MAX_ITERATIONS + 2):
         for batch_index in range(1, DEFAULT_BATCH_SIZE + 1):
-            timing = run_benchmark_script_detailed(artifact.path).timing
-            timings.append(timing)
+            run = run_benchmark_script_detailed(artifact.path)
+            timings.append(run.timing)
             rows.append({
                 'proportion': repr(artifact.proportion),
                 'proportion_index': artifact.proportion_index,
                 'proportion_hex_id': artifact.proportion_hex_id,
                 'batch_number': batch_number,
                 'batch_index': batch_index,
-                'run_length': repr(timing),
+                'run_length': repr(run.timing),
+                'stdout': run.result.stdout,
+                'stderr': run.result.stderr,
             })
         if has_converged(timings):
             break
@@ -291,12 +292,24 @@ def run_experiment(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Run simple detyping proportion experiments')
-    parser.add_argument('benchmarks', nargs='*', help='Benchmark names. Defaults to bench_status.md All green.')
+    parser.add_argument('benchmarks', nargs='*', help='Benchmark names. Defaults to bench_status.csv all_green rows.')
     parser.add_argument('--output-root', type=Path, default=OUTPUT_ROOT)
     parser.add_argument('--samples-per-proportion', type=int, default=1)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--limit', type=int, help='Maximum number of artifacts to run across the whole experiment')
     return parser.parse_args()
+
+
+def benchmarks_from_status(status_path: Path = BENCH_STATUS) -> list[str]:
+    if not status_path.exists():
+        return DEFAULT_BENCHMARKS
+
+    with status_path.open('r', newline='', encoding='utf-8') as handle:
+        return [
+            row['benchmark']
+            for row in csv.DictReader(handle)
+            if row.get('category') == 'all_green'
+        ]
 
 
 def main() -> None:

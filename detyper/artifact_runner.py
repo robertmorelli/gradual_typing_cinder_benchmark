@@ -101,13 +101,6 @@ def raise_for_failed_run(result: RunResult, *, require_parseable_time: bool = Fa
         )
 
 
-def run_timed_python_artifact(
-    artifact_path: Path,
-    label: str | None = None,
-) -> float:
-    return run_timed_python_artifact_detailed(artifact_path, label=label).timing
-
-
 def run_timed_python_artifact_detailed(
     artifact_path: Path,
     label: str | None = None,
