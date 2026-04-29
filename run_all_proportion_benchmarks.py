@@ -1,146 +1,119 @@
-"""Run proportion benchmarks, stream progress, write a rich CSV, and render Markdown from it."""
+"""Run detyping proportion experiments and write simple CSV outputs."""
 
 from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
-import json
 import math
 import random
+import shutil
 import statistics
-import sys
-import time
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from benchmark_harness import benchmark_output_dir, resolve_benchmark_path
-from detyper.artifacts import SourceArtifactSet, build_source_variant, load_source_artifacts
+from benchmark_harness import resolve_benchmark_path
+from detyper.artifacts import build_source_variant, load_source_artifacts
 from stabalize import (
     BOOTSTRAP_RESAMPLES,
     DEFAULT_ALPHA,
     DEFAULT_BATCH_SIZE,
     DEFAULT_MAX_ITERATIONS,
-    DEFAULT_RUN_RETRIES,
     DEFAULT_TOLERANCE,
     run_benchmark_script_detailed,
 )
 
-LATEST_REPORT = Path('proportion_benchmark_report.md')
-OUTPUT_DIR = Path('benchmark_results')
-STATUS_FILE = Path('bench_status.md')
-RNG_SEED = 0
-ITERATIONS_PER_PROPORTION = 1025
-
-CSV_FIELDNAMES = [
-    'generated_at',
-    'row_started_at',
-    'row_finished_at',
-    'row_elapsed_seconds',
-    'random_seed',
-    'iterations_per_proportion',
-    'benchmark_base_name',
-    'benchmark_variant',
-    'benchmark_name',
-    'source_path',
-    'source_exists',
-    'source_size_bytes',
-    'source_sha256',
-    'output_dir',
-    'artifact_path',
-    'artifact_exists',
-    'artifact_size_bytes',
-    'artifact_sha256',
-    'artifact_perm_hex',
-    'artifact_label',
-    'total_targets',
-    'variant_names_json',
-    'detyped',
-    'total',
+BENCH_STATUS = Path('bench_status.md')
+OUTPUT_ROOT = Path('benchmark_results')
+VARIANTS = ('advanced', 'shallow', 'untyped')
+RAW_FIELDS = [
     'proportion',
-    'sample_index',
-    'combination_count',
-    'bucket_example_count',
-    'example_sequence_index',
-    'total_examples_planned',
-    'variant_bits',
-    'variant_indices_json',
-    'variant_names_selected_json',
-    'success',
-    'error_type',
-    'error_message',
-    'error_json',
-    'batch_size',
-    'tolerance',
-    'alpha',
-    'max_iterations',
-    'max_batches',
-    'bootstrap_resamples',
-    'retries',
-    'expected_total_runs',
-    'runs_completed_before_row',
-    'runs_completed_after_row',
-    'attempts_total',
-    'attempts_per_sample_json',
-    'retry_errors_per_sample_json',
-    'returncodes_json',
-    'stdout_json',
-    'stderr_json',
-    'sample_timings_json',
-    'sample_min',
-    'sample_max',
-    'sample_median',
-    'mean',
-    'stdev',
-    'total_samples',
-    'batches',
-    'converged',
-    'ci_lower',
-    'ci_upper',
-    'batch_sample_counts_json',
-    'batch_means_json',
-    'batch_stdevs_json',
-    'batch_ci_lowers_json',
-    'batch_ci_uppers_json',
-    'batch_converged_json',
+    'proportion_index',
+    'proportion_hex_id',
+    'batch_number',
+    'batch_index',
+    'run_length',
+]
+SUMMARY_FIELDS = [
+    'proportion',
+    'average_runtime',
+    'min_runtime',
+    'max_runtime',
 ]
 
 
-def _benchmarks_from_status() -> list[str]:
+@dataclass(frozen=True)
+class Experiment:
+    root: Path
+    files: Path
+
+
+@dataclass(frozen=True)
+class Artifact:
+    path: Path
+    proportion: float
+    proportion_index: int
+    proportion_hex_id: str
+
+
+def benchmarks_from_status() -> list[str]:
     benchmarks: list[str] = []
-    in_works = False
-    for line in STATUS_FILE.read_text(encoding='utf-8').splitlines():
+    in_green_section = False
+
+    for line in BENCH_STATUS.read_text(encoding='utf-8').splitlines():
         if line in {'## Detyping works', '### All green'}:
-            in_works = True
+            in_green_section = True
             continue
-        if in_works and line.startswith('## '):
+        if in_green_section and line.startswith(('## ', '### ')):
             break
-        if in_works and line.startswith('### ') and line != '### All green':
-            break
-        if in_works and line.startswith('- '):
+        if in_green_section and line.startswith('- '):
             benchmarks.append(line[2:].strip())
+
     return benchmarks
 
 
-def _json_dump(value: object) -> str:
-    return json.dumps(value, sort_keys=True)
+def timestamp() -> str:
+    return datetime.now().astimezone().strftime('%Y%m%dT%H%M%S%z')
 
 
-def _path_sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def new_experiment(output_root: Path) -> Experiment:
+    root = output_root / f'experiment_{timestamp()}'
+    files = root / 'files'
+    files.mkdir(parents=True, exist_ok=False)
+    return Experiment(root=root, files=files)
 
 
-def _path_size(path: Path) -> int:
-    return path.stat().st_size
+def csv_name(benchmark: str, variant: str, kind: str) -> str:
+    return f'{benchmark}_{variant}_{kind}.csv'
 
 
-def _variant_count(total: int, detyped: int) -> int:
-    if total == 0 or detyped == 0 or detyped == total:
-        return 1
-    return min(ITERATIONS_PER_PROPORTION, math.comb(total, detyped))
+def write_csv(path: Path, fields: list[str], rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('w', newline='', encoding='utf-8') as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
-def _sample_variants(total: int, detyped: int, rng: random.Random) -> list[tuple[bool, ...]]:
+def summarize(raw_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    timings_by_proportion: dict[str, list[float]] = defaultdict(list)
+    for row in raw_rows:
+        timings_by_proportion[str(row['proportion'])].append(float(row['run_length']))
+
+    summary_rows: list[dict[str, object]] = []
+    for proportion in sorted(timings_by_proportion, key=float):
+        timings = timings_by_proportion[proportion]
+        summary_rows.append({
+            'proportion': proportion,
+            'average_runtime': repr(statistics.fmean(timings)),
+            'min_runtime': repr(min(timings)),
+            'max_runtime': repr(max(timings)),
+        })
+    return summary_rows
+
+
+def sample_variants(total: int, detyped: int, samples_per_proportion: int, rng: random.Random) -> list[tuple[bool, ...]]:
     if total == 0:
         return [tuple()]
     if detyped == 0:
@@ -148,663 +121,195 @@ def _sample_variants(total: int, detyped: int, rng: random.Random) -> list[tuple
     if detyped == total:
         return [tuple(True for _ in range(total))]
 
-    target = _variant_count(total, detyped)
+    sample_count = min(samples_per_proportion, math.comb(total, detyped))
     variants: list[tuple[bool, ...]] = []
     seen: set[tuple[bool, ...]] = set()
-    while len(variants) < target:
-        chosen = frozenset(rng.sample(range(total), detyped))
-        variant = tuple(index in chosen for index in range(total))
-        if variant in seen:
-            continue
-        seen.add(variant)
-        variants.append(variant)
+    while len(variants) < sample_count:
+        selected = set(rng.sample(range(total), detyped))
+        variant = tuple(index in selected for index in range(total))
+        if variant not in seen:
+            seen.add(variant)
+            variants.append(variant)
     return variants
 
 
-def _artifact_path(output_dir: Path, source_stem: str, perm_hex: str, detyped: int, sample_index: int) -> Path:
-    proportion_dir = output_dir / 'proportion_sweep'
-    proportion_dir.mkdir(parents=True, exist_ok=True)
-    return proportion_dir / f'{source_stem}_{perm_hex}_k{detyped:02d}_s{sample_index:02d}.py'
+def write_variant_artifacts(
+    benchmark: str,
+    variant_name: str,
+    experiment: Experiment,
+    samples_per_proportion: int,
+    rng: random.Random,
+    artifact_limit: int | None,
+) -> list[Artifact]:
+    source_path = resolve_benchmark_path(benchmark, variant=variant_name)
+    output_dir = experiment.files / benchmark / variant_name
+    artifacts = load_source_artifacts(source_path, output_dir=output_dir)
+    total = len(artifacts.variant_names)
+    result: list[Artifact] = []
+
+    for detyped in range(total + 1):
+        proportion = 0.0 if total == 0 else detyped / total
+        for proportion_index, choices in enumerate(
+            sample_variants(total, detyped, samples_per_proportion, rng),
+            start=1,
+        ):
+            if artifact_limit is not None and len(result) >= artifact_limit:
+                return result
+            program = build_source_variant(artifacts, choices)
+            artifact_path = output_dir / f'{artifacts.source_stem}_{program.perm_hex}_k{detyped:02d}_s{proportion_index:02d}.py'
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_text(program.source, encoding='utf-8')
+            result.append(Artifact(
+                path=artifact_path,
+                proportion=proportion,
+                proportion_index=proportion_index,
+                proportion_hex_id=program.perm_hex,
+            ))
+
+    return result
 
 
-def _bootstrap_summary(data: list[float]) -> tuple[float, float, float, float]:
-    if not data:
-        return (0.0, 0.0, 0.0, 0.0)
-    sample_mean = statistics.fmean(data)
-    sample_stdev = 0.0 if len(data) < 2 else statistics.stdev(data)
-    resample_means = sorted(
-        statistics.fmean(random.choices(data, k=len(data)))
+def write_untyped_artifact(benchmark: str, experiment: Experiment) -> list[Artifact]:
+    source_path = resolve_benchmark_path(benchmark, variant='untyped')
+    artifact_path = experiment.files / benchmark / 'untyped' / source_path.name
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source_path, artifact_path)
+    return [Artifact(
+        path=artifact_path,
+        proportion=1.0,
+        proportion_index=1,
+        proportion_hex_id='untyped',
+    )]
+
+
+def bootstrap_interval(timings: list[float]) -> tuple[float, float]:
+    means = sorted(
+        statistics.fmean(random.choices(timings, k=len(timings)))
         for _ in range(BOOTSTRAP_RESAMPLES)
     )
-    lower_index = int((DEFAULT_ALPHA / 2) * len(resample_means))
-    upper_index = int((1 - DEFAULT_ALPHA / 2) * len(resample_means)) - 1
-    ci_lower = resample_means[max(0, lower_index)]
-    ci_upper = resample_means[min(len(resample_means) - 1, upper_index)]
-    return sample_mean, sample_stdev, ci_lower, ci_upper
+    lower = int((DEFAULT_ALPHA / 2) * len(means))
+    upper = int((1 - DEFAULT_ALPHA / 2) * len(means)) - 1
+    return means[max(0, lower)], means[min(len(means) - 1, upper)]
 
 
-class ProgressTracker:
-    def __init__(self, total_examples: int, batch_size: int, max_batches: int) -> None:
-        self.total_examples = max(total_examples, 1)
-        self.batch_size = batch_size
-        self.max_batches = max_batches
-        self.units_per_example = batch_size * max_batches
-        self.total_units = self.total_examples * self.units_per_example
-        self.last_len = 0
-
-    def update(
-        self,
-        *,
-        example_sequence_index: int,
-        benchmark_name: str,
-        detyped: int,
-        total: int,
-        sample_index: int,
-        batch_index: int,
-        run_index: int,
-    ) -> None:
-        units_done = (
-            (example_sequence_index - 1) * self.units_per_example
-            + (batch_index - 1) * self.batch_size
-            + run_index
-        )
-        percent = 100.0 * units_done / self.total_units
-        line = (
-            f'overall completion: {percent:6.2f}% | '
-            f'benchmark: {benchmark_name} '
-            f'proportion: {detyped}/{total} '
-            f'example: {sample_index}'
-        )
-        sys.stdout.write('\r' + line.ljust(self.last_len))
-        sys.stdout.flush()
-        self.last_len = max(self.last_len, len(line))
-
-    def finish(self) -> None:
-        if self.last_len:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+def has_converged(timings: list[float]) -> bool:
+    mean = statistics.fmean(timings)
+    margin = abs(mean * DEFAULT_TOLERANCE)
+    ci_lower, ci_upper = bootstrap_interval(timings)
+    return (mean - margin) <= ci_lower and ci_upper <= (mean + margin)
 
 
-def _make_base_row(
-    *,
-    generated_at: str,
-    benchmark_base_name: str,
-    benchmark_variant: str,
-    benchmark_name: str,
-    source_path: Path,
-    output_dir: Path,
-    artifact_path: Path,
-    artifact_perm_hex: str,
-    artifact_label: str,
-    total_targets: int,
-    variant_names: list[str],
-    detyped: int,
-    total: int,
-    sample_index: int,
-    combination_count: int,
-    bucket_example_count: int,
-    example_sequence_index: int,
-    total_examples_planned: int,
-    variant: tuple[bool, ...],
-) -> dict[str, object]:
-    selected_indices = [index for index, chosen in enumerate(variant) if chosen]
-    selected_names = [variant_names[index] for index in selected_indices]
-    source_exists = source_path.exists()
-    artifact_exists = artifact_path.exists()
-    return {
-        'generated_at': generated_at,
-        'row_started_at': '',
-        'row_finished_at': '',
-        'row_elapsed_seconds': '',
-        'random_seed': RNG_SEED,
-        'iterations_per_proportion': ITERATIONS_PER_PROPORTION,
-        'benchmark_base_name': benchmark_base_name,
-        'benchmark_variant': benchmark_variant,
-        'benchmark_name': benchmark_name,
-        'source_path': str(source_path),
-        'source_exists': 'true' if source_exists else 'false',
-        'source_size_bytes': str(_path_size(source_path)) if source_exists else '',
-        'source_sha256': _path_sha256(source_path) if source_exists else '',
-        'output_dir': str(output_dir),
-        'artifact_path': str(artifact_path),
-        'artifact_exists': 'true' if artifact_exists else 'false',
-        'artifact_size_bytes': str(_path_size(artifact_path)) if artifact_exists else '',
-        'artifact_sha256': _path_sha256(artifact_path) if artifact_exists else '',
-        'artifact_perm_hex': artifact_perm_hex,
-        'artifact_label': artifact_label,
-        'total_targets': total_targets,
-        'variant_names_json': _json_dump(variant_names),
-        'detyped': detyped,
-        'total': total,
-        'proportion': repr(0.0 if total == 0 else detyped / total),
-        'sample_index': sample_index,
-        'combination_count': combination_count,
-        'bucket_example_count': bucket_example_count,
-        'example_sequence_index': example_sequence_index,
-        'total_examples_planned': total_examples_planned,
-        'variant_bits': ''.join('1' if chosen else '0' for chosen in variant),
-        'variant_indices_json': _json_dump(selected_indices),
-        'variant_names_selected_json': _json_dump(selected_names),
-        'success': 'false',
-        'error_type': '',
-        'error_message': '',
-        'error_json': '',
-        'batch_size': DEFAULT_BATCH_SIZE,
-        'tolerance': repr(DEFAULT_TOLERANCE),
-        'alpha': repr(DEFAULT_ALPHA),
-        'max_iterations': DEFAULT_MAX_ITERATIONS,
-        'max_batches': DEFAULT_MAX_ITERATIONS + 1,
-        'bootstrap_resamples': BOOTSTRAP_RESAMPLES,
-        'retries': DEFAULT_RUN_RETRIES,
-        'expected_total_runs': total_examples_planned * DEFAULT_BATCH_SIZE * (DEFAULT_MAX_ITERATIONS + 1),
-        'runs_completed_before_row': (example_sequence_index - 1) * DEFAULT_BATCH_SIZE * (DEFAULT_MAX_ITERATIONS + 1),
-        'runs_completed_after_row': '',
-        'attempts_total': '',
-        'attempts_per_sample_json': '[]',
-        'retry_errors_per_sample_json': '[]',
-        'returncodes_json': '[]',
-        'stdout_json': '[]',
-        'stderr_json': '[]',
-        'sample_timings_json': '[]',
-        'sample_min': '',
-        'sample_max': '',
-        'sample_median': '',
-        'mean': '',
-        'stdev': '',
-        'total_samples': '',
-        'batches': '',
-        'converged': '',
-        'ci_lower': '',
-        'ci_upper': '',
-        'batch_sample_counts_json': '[]',
-        'batch_means_json': '[]',
-        'batch_stdevs_json': '[]',
-        'batch_ci_lowers_json': '[]',
-        'batch_ci_uppers_json': '[]',
-        'batch_converged_json': '[]',
-    }
-
-
-def _stabilize_artifact(
-    *,
-    script_path: Path,
-    progress: ProgressTracker,
-    example_sequence_index: int,
-    benchmark_name: str,
-    detyped: int,
-    total: int,
-    sample_index: int,
-) -> dict[str, object]:
+def run_artifact(artifact: Artifact) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     timings: list[float] = []
-    attempts_per_sample: list[int] = []
-    retry_errors_per_sample: list[list[str]] = []
-    returncodes: list[int] = []
-    stdouts: list[str] = []
-    stderrs: list[str] = []
-    batch_sample_counts: list[int] = []
-    batch_means: list[float] = []
-    batch_stdevs: list[float] = []
-    batch_ci_lowers: list[float] = []
-    batch_ci_uppers: list[float] = []
-    batch_converged: list[bool] = []
 
-    for batch_index in range(1, DEFAULT_MAX_ITERATIONS + 2):
-        for run_index in range(1, DEFAULT_BATCH_SIZE + 1):
-            progress.update(
-                example_sequence_index=example_sequence_index,
-                benchmark_name=benchmark_name,
-                detyped=detyped,
-                total=total,
-                sample_index=sample_index,
-                batch_index=batch_index,
-                run_index=run_index,
-            )
-            try:
-                detailed = run_benchmark_script_detailed(script_path)
-            except Exception as exc:
-                return {
-                    'timings': timings,
-                    'attempts_per_sample': attempts_per_sample,
-                    'retry_errors_per_sample': retry_errors_per_sample,
-                    'returncodes': returncodes,
-                    'stdouts': stdouts,
-                    'stderrs': stderrs,
-                    'batch_sample_counts': batch_sample_counts,
-                    'batch_means': batch_means,
-                    'batch_stdevs': batch_stdevs,
-                    'batch_ci_lowers': batch_ci_lowers,
-                    'batch_ci_uppers': batch_ci_uppers,
-                    'batch_converged': batch_converged,
-                    'error_type': type(exc).__name__,
-                    'error_message': str(exc).strip(),
-                }
-            timings.append(detailed.timing)
-            attempts_per_sample.append(detailed.attempts)
-            retry_errors_per_sample.append(list(detailed.attempt_errors))
-            returncodes.append(detailed.timed_run.result.returncode)
-            stdouts.append(detailed.timed_run.result.stdout)
-            stderrs.append(detailed.timed_run.result.stderr)
-
-        mean, stdev, ci_lower, ci_upper = _bootstrap_summary(timings)
-        margin = abs(mean * DEFAULT_TOLERANCE)
-        converged = (mean - margin) <= ci_lower and ci_upper <= (mean + margin)
-        batch_sample_counts.append(len(timings))
-        batch_means.append(mean)
-        batch_stdevs.append(stdev)
-        batch_ci_lowers.append(ci_lower)
-        batch_ci_uppers.append(ci_upper)
-        batch_converged.append(converged)
-        if converged:
+    for batch_number in range(1, DEFAULT_MAX_ITERATIONS + 2):
+        for batch_index in range(1, DEFAULT_BATCH_SIZE + 1):
+            timing = run_benchmark_script_detailed(artifact.path).timing
+            timings.append(timing)
+            rows.append({
+                'proportion': repr(artifact.proportion),
+                'proportion_index': artifact.proportion_index,
+                'proportion_hex_id': artifact.proportion_hex_id,
+                'batch_number': batch_number,
+                'batch_index': batch_index,
+                'run_length': repr(timing),
+            })
+        if has_converged(timings):
             break
 
-    return {
-        'timings': timings,
-        'attempts_per_sample': attempts_per_sample,
-        'retry_errors_per_sample': retry_errors_per_sample,
-        'returncodes': returncodes,
-        'stdouts': stdouts,
-        'stderrs': stderrs,
-        'batch_sample_counts': batch_sample_counts,
-        'batch_means': batch_means,
-        'batch_stdevs': batch_stdevs,
-        'batch_ci_lowers': batch_ci_lowers,
-        'batch_ci_uppers': batch_ci_uppers,
-        'batch_converged': batch_converged,
-        'error_type': '',
-        'error_message': '',
-    }
-
-
-def _finalize_row(row: dict[str, object], details: dict[str, object], row_started_at: float) -> dict[str, object]:
-    timings: list[float] = details['timings']  # type: ignore[assignment]
-    row_finished_at = datetime.now().astimezone().isoformat(timespec='seconds')
-    row['row_started_at'] = datetime.fromtimestamp(row_started_at).astimezone().isoformat(timespec='seconds')
-    row['row_finished_at'] = row_finished_at
-    row['row_elapsed_seconds'] = repr(time.time() - row_started_at)
-    row['runs_completed_after_row'] = row['runs_completed_before_row'] + len(timings)
-    row['attempts_total'] = sum(details['attempts_per_sample'])  # type: ignore[arg-type]
-    row['attempts_per_sample_json'] = _json_dump(details['attempts_per_sample'])
-    row['retry_errors_per_sample_json'] = _json_dump(details['retry_errors_per_sample'])
-    row['returncodes_json'] = _json_dump(details['returncodes'])
-    row['stdout_json'] = _json_dump(details['stdouts'])
-    row['stderr_json'] = _json_dump(details['stderrs'])
-    row['sample_timings_json'] = _json_dump(timings)
-    row['batch_sample_counts_json'] = _json_dump(details['batch_sample_counts'])
-    row['batch_means_json'] = _json_dump(details['batch_means'])
-    row['batch_stdevs_json'] = _json_dump(details['batch_stdevs'])
-    row['batch_ci_lowers_json'] = _json_dump(details['batch_ci_lowers'])
-    row['batch_ci_uppers_json'] = _json_dump(details['batch_ci_uppers'])
-    row['batch_converged_json'] = _json_dump(details['batch_converged'])
-    row['error_type'] = details['error_type']
-    row['error_message'] = details['error_message']
-    row['error_json'] = _json_dump(
-        {
-            'type': details['error_type'],
-            'message': details['error_message'],
-        }
-    ) if details['error_message'] else ''
-    if not timings:
-        return row
-
-    mean = details['batch_means'][-1]
-    stdev = details['batch_stdevs'][-1]
-    ci_lower = details['batch_ci_lowers'][-1]
-    ci_upper = details['batch_ci_uppers'][-1]
-    converged = details['batch_converged'][-1]
-    row.update(
-        success='true',
-        sample_min=repr(min(timings)),
-        sample_max=repr(max(timings)),
-        sample_median=repr(statistics.median(timings)),
-        mean=repr(mean),
-        stdev=repr(stdev),
-        total_samples=len(timings),
-        batches=len(details['batch_sample_counts']),
-        converged='true' if converged else 'false',
-        ci_lower=repr(ci_lower),
-        ci_upper=repr(ci_upper),
-    )
-    if details['error_message']:
-        row['success'] = 'false'
-    return row
-
-
-def _run_example(
-    *,
-    generated_at: str,
-    benchmark_base_name: str,
-    benchmark_variant: str,
-    benchmark_name: str,
-    source_path: Path,
-    output_dir: Path,
-    artifact_path: Path,
-    artifact_perm_hex: str,
-    artifact_label: str,
-    total_targets: int,
-    variant_names: list[str],
-    detyped: int,
-    total: int,
-    sample_index: int,
-    combination_count: int,
-    bucket_example_count: int,
-    example_sequence_index: int,
-    total_examples_planned: int,
-    variant: tuple[bool, ...],
-    progress: ProgressTracker,
-) -> dict[str, object]:
-    row = _make_base_row(
-        generated_at=generated_at,
-        benchmark_base_name=benchmark_base_name,
-        benchmark_variant=benchmark_variant,
-        benchmark_name=benchmark_name,
-        source_path=source_path,
-        output_dir=output_dir,
-        artifact_path=artifact_path,
-        artifact_perm_hex=artifact_perm_hex,
-        artifact_label=artifact_label,
-        total_targets=total_targets,
-        variant_names=variant_names,
-        detyped=detyped,
-        total=total,
-        sample_index=sample_index,
-        combination_count=combination_count,
-        bucket_example_count=bucket_example_count,
-        example_sequence_index=example_sequence_index,
-        total_examples_planned=total_examples_planned,
-        variant=variant,
-    )
-    row_started_at = time.time()
-    details = _stabilize_artifact(
-        script_path=artifact_path,
-        progress=progress,
-        example_sequence_index=example_sequence_index,
-        benchmark_name=benchmark_name,
-        detyped=detyped,
-        total=total,
-        sample_index=sample_index,
-    )
-    return _finalize_row(row, details, row_started_at)
-
-
-def _plan_total_examples(benchmarks: list[str]) -> int:
-    total_examples = 0
-    for name in benchmarks:
-        for variant in ('advanced', 'shallow'):
-            source_path = resolve_benchmark_path(name, variant=variant)
-            total_targets = len(load_source_artifacts(source_path).variant_names)
-            total_examples += sum(_variant_count(total_targets, detyped) for detyped in range(total_targets + 1))
-        total_examples += 1
-    return total_examples
-
-
-def _run_benchmark(
-    name: str,
-    rng: random.Random,
-    generated_at: str,
-    progress: ProgressTracker,
-    total_examples_planned: int,
-    example_counter: int,
-) -> tuple[list[dict[str, object]], int]:
-    rows: list[dict[str, object]] = []
-
-    for variant_name in ('advanced', 'shallow'):
-        source_path = resolve_benchmark_path(name, variant=variant_name)
-        output_dir = benchmark_output_dir(source_path)
-        artifacts = load_source_artifacts(source_path, output_dir=output_dir)
-        total_targets = len(artifacts.variant_names)
-        for detyped in range(total_targets + 1):
-            bucket_example_count = _variant_count(total_targets, detyped)
-            combination_count = math.comb(total_targets, detyped) if total_targets else 1
-            for sample_index, variant in enumerate(_sample_variants(total_targets, detyped, rng), start=1):
-                program = build_source_variant(artifacts, variant)
-                artifact_label = f'k{detyped:02d}_s{sample_index:02d}'
-                artifact_path = _artifact_path(output_dir, artifacts.source_stem, program.perm_hex, detyped, sample_index)
-                artifact_path.write_text(program.source, encoding='utf-8')
-                rows.append(
-                    _run_example(
-                        generated_at=generated_at,
-                        benchmark_base_name=name,
-                        benchmark_variant=variant_name,
-                        benchmark_name=f'{name}/{variant_name}',
-                        source_path=artifacts.source_path,
-                        output_dir=output_dir,
-                        artifact_path=artifact_path,
-                        artifact_perm_hex=program.perm_hex,
-                        artifact_label=artifact_label,
-                        total_targets=total_targets,
-                        variant_names=artifacts.variant_names,
-                        detyped=detyped,
-                        total=total_targets,
-                        sample_index=sample_index,
-                        combination_count=combination_count,
-                        bucket_example_count=bucket_example_count,
-                        example_sequence_index=example_counter,
-                        total_examples_planned=total_examples_planned,
-                        variant=variant,
-                        progress=progress,
-                    )
-                )
-                example_counter += 1
-
-    source_path = resolve_benchmark_path(name, variant='untyped')
-    rows.append(
-        _run_example(
-            generated_at=generated_at,
-            benchmark_base_name=name,
-            benchmark_variant='untyped',
-            benchmark_name=f'{name}/untyped',
-            source_path=source_path,
-            output_dir=source_path.parent,
-            artifact_path=source_path,
-            artifact_perm_hex='',
-            artifact_label='untyped',
-            total_targets=0,
-            variant_names=[],
-            detyped=0,
-            total=0,
-            sample_index=1,
-            combination_count=1,
-            bucket_example_count=1,
-            example_sequence_index=example_counter,
-            total_examples_planned=total_examples_planned,
-            variant=tuple(),
-            progress=progress,
-        )
-    )
-    example_counter += 1
-    return rows, example_counter
-
-
-def write_csv(rows: list[dict[str, object]], csv_path: Path) -> None:
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open('w', newline='', encoding='utf-8') as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def load_csv_rows(csv_path: Path) -> list[dict[str, object]]:
-    with csv_path.open('r', newline='', encoding='utf-8') as handle:
-        rows = list(csv.DictReader(handle))
-    for row in rows:
-        for key in ('random_seed', 'iterations_per_proportion', 'total_targets', 'detyped', 'total', 'sample_index'):
-            row[key] = int(row[key])
-        for key in ('proportion', 'mean', 'stdev', 'ci_lower', 'ci_upper'):
-            row[key] = None if row[key] == '' else float(row[key])
-        for key in ('batches', 'total_samples'):
-            row[key] = None if row[key] == '' else int(row[key])
-        row['converged'] = None if row['converged'] == '' else row['converged'] == 'true'
     return rows
 
 
-def _group_rows(rows: list[dict[str, object]]) -> list[tuple[str, int, list[dict[str, object]]]]:
-    grouped: dict[str, list[dict[str, object]]] = {}
-    totals: dict[str, int] = {}
-    order: list[str] = []
-    for row in rows:
-        name = row['benchmark_name']
-        if name not in grouped:
-            grouped[name] = []
-            totals[name] = row['total_targets']
-            order.append(name)
-        grouped[name].append(row)
-    return [(name, totals[name], grouped[name]) for name in order]
+def artifacts_for_variant(
+    benchmark: str,
+    variant_name: str,
+    experiment: Experiment,
+    samples_per_proportion: int,
+    rng: random.Random,
+    artifact_limit: int | None,
+) -> list[Artifact]:
+    if variant_name == 'untyped':
+        return write_untyped_artifact(benchmark, experiment)
+    return write_variant_artifacts(benchmark, variant_name, experiment, samples_per_proportion, rng, artifact_limit)
 
 
-def _format_summary(rows: list[dict[str, object]]) -> str:
-    lines = [
-        '| proportion | detyped | timed samples | mean time | min | max | avg batches | all converged | status |',
-        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |',
-    ]
-    buckets: dict[int, list[dict[str, object]]] = {}
-    for row in rows:
-        buckets.setdefault(row['detyped'], []).append(row)
-    for detyped in sorted(buckets):
-        bucket = buckets[detyped]
-        successes = [row for row in bucket if row['mean'] is not None]
-        failures = [row for row in bucket if row['error_message']]
-        proportion = 0.0 if bucket[0]['total'] == 0 else detyped / bucket[0]['total']
-        if successes:
-            times = [row['mean'] for row in successes]
-            batches = [row['batches'] for row in successes]
-            converged = [row['converged'] for row in successes]
-            mean_s = f'{statistics.fmean(times):.4f}s'
-            min_s = f'{min(times):.4f}s'
-            max_s = f'{max(times):.4f}s'
-            batch_s = f'{statistics.fmean(batches):.1f}'
-            converged_s = 'yes' if all(converged) else 'no'
-        else:
-            mean_s = min_s = max_s = batch_s = converged_s = '-'
-        status = f'{len(failures)} failed' if failures else 'ok'
-        lines.append(
-            f'| {proportion:.2f} | {detyped}/{bucket[0]["total"]} | {len(successes)} '
-            f'| {mean_s} | {min_s} | {max_s} | {batch_s} | {converged_s} | {status} |'
-        )
-    return '\n'.join(lines)
+def run_variant(
+    benchmark: str,
+    variant_name: str,
+    experiment: Experiment,
+    samples_per_proportion: int,
+    rng: random.Random,
+    remaining_limit: int | None,
+) -> int:
+    artifacts = artifacts_for_variant(benchmark, variant_name, experiment, samples_per_proportion, rng, remaining_limit)
+
+    print(f'{benchmark}/{variant_name}: running {len(artifacts)} artifacts', flush=True)
+    raw_path = experiment.root / csv_name(benchmark, variant_name, 'raw')
+    summary_path = experiment.root / csv_name(benchmark, variant_name, 'summary')
+    raw_rows: list[dict[str, object]] = []
+    write_csv(raw_path, RAW_FIELDS, raw_rows)
+    write_csv(summary_path, SUMMARY_FIELDS, [])
+
+    for artifact_index, artifact in enumerate(artifacts, start=1):
+        print(f'  {artifact_index}/{len(artifacts)} {artifact.path.name}', flush=True)
+        raw_rows.extend(run_artifact(artifact))
+        write_csv(raw_path, RAW_FIELDS, raw_rows)
+        write_csv(summary_path, SUMMARY_FIELDS, summarize(raw_rows))
+
+    return len(artifacts)
 
 
-def _format_details(rows: list[dict[str, object]]) -> str:
-    lines = [
-        '| proportion | detyped | sample | mean time | stdev | batches | total samples | converged | ci lower | ci upper | artifact | notes |',
-        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |',
-    ]
-    for row in rows:
-        proportion = 0.0 if row['total'] == 0 else row['detyped'] / row['total']
-        if row['mean'] is None:
-            cells = ('-', '-', '-', '-', '-', '-', '-')
-        else:
-            cells = (
-                f'{row["mean"]:.4f}s',
-                f'{row["stdev"]:.4f}s',
-                str(row['batches']),
-                str(row['total_samples']),
-                'yes' if row['converged'] else 'no',
-                f'{row["ci_lower"]:.4f}s',
-                f'{row["ci_upper"]:.4f}s',
+def run_experiment(
+    benchmarks: list[str],
+    output_root: Path,
+    samples_per_proportion: int,
+    seed: int,
+    limit: int | None,
+) -> Experiment:
+    experiment = new_experiment(output_root)
+    rng = random.Random(seed)
+    remaining_limit = limit
+
+    for benchmark in benchmarks:
+        for variant_name in VARIANTS:
+            if remaining_limit == 0:
+                return experiment
+            completed = run_variant(
+                benchmark,
+                variant_name,
+                experiment,
+                samples_per_proportion,
+                rng,
+                remaining_limit,
             )
-        lines.append(
-            f'| {proportion:.2f} | {row["detyped"]}/{row["total"]} | {row["sample_index"]} '
-            f'| {cells[0]} | {cells[1]} | {cells[2]} | {cells[3]} | {cells[4]} | {cells[5]} | {cells[6]} '
-            f'| `{row["artifact_path"]}` | {row["error_message"]} |'
-        )
-    return '\n'.join(lines)
+            if remaining_limit is not None:
+                remaining_limit -= completed
+
+    return experiment
 
 
-def render_markdown(rows: list[dict[str, object]], csv_path: Path) -> str:
-    generated_at = rows[0]['generated_at'] if rows else datetime.now().astimezone().isoformat(timespec='seconds')
-    iterations = rows[0]['iterations_per_proportion'] if rows else ITERATIONS_PER_PROPORTION
-    seed = rows[0]['random_seed'] if rows else RNG_SEED
-    lines = [
-        '# Proportion Benchmark Report',
-        '',
-        f'- Generated: `{generated_at}`',
-        f'- Source CSV: `{csv_path}`',
-        f'- Benchmarks run serially: `yes`',
-        f'- Iterations per detyped-count bucket: `{iterations}`',
-        f'- Random seed: `{seed}`',
-        '',
-    ]
-    for benchmark_name, total_targets, group_rows in _group_rows(rows):
-        lines.extend([
-            f'## {benchmark_name}',
-            '',
-            f'- Detypable targets: `{total_targets}`',
-            f'- Total runs: `{len(group_rows)}`',
-            '',
-            '### Summary',
-            '',
-            _format_summary(group_rows),
-            '',
-            '### Detailed Runs',
-            '',
-            _format_details(group_rows),
-            '',
-        ])
-    return '\n'.join(lines)
-
-
-def write_report_from_csv(csv_path: Path, report_path: Path | None = None) -> Path:
-    rows = load_csv_rows(csv_path)
-    target = report_path or csv_path.with_suffix('.md')
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(render_markdown(rows, csv_path), encoding='utf-8')
-    return target
-
-
-def _default_csv_path(now: datetime) -> Path:
-    return OUTPUT_DIR / f'proportion_benchmark_{now.strftime("%Y%m%dT%H%M%S%z")}.csv'
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description='Run simple detyping proportion experiments')
+    parser.add_argument('benchmarks', nargs='*', help='Benchmark names. Defaults to bench_status.md All green.')
+    parser.add_argument('--output-root', type=Path, default=OUTPUT_ROOT)
+    parser.add_argument('--samples-per-proportion', type=int, default=1)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--limit', type=int, help='Maximum number of artifacts to run across the whole experiment')
+    return parser.parse_args()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Run detyping proportion benchmarks and emit CSV + Markdown')
-    parser.add_argument('--from-csv', type=Path, help='Render Markdown from an existing CSV instead of rerunning')
-    parser.add_argument('--csv-out', type=Path, help='Output CSV path for a new run')
-    parser.add_argument('--report-out', type=Path, help='Output Markdown path')
-    args = parser.parse_args()
-
-    if args.from_csv is not None:
-        report_path = write_report_from_csv(args.from_csv, args.report_out)
-        LATEST_REPORT.write_text(report_path.read_text(encoding='utf-8'), encoding='utf-8')
-        print(f'Wrote {report_path}', flush=True)
-        print(f'Updated {LATEST_REPORT}', flush=True)
-        return
-
-    now = datetime.now().astimezone()
-    generated_at = now.isoformat(timespec='seconds')
-    csv_path = args.csv_out or _default_csv_path(now)
-    report_path = args.report_out or csv_path.with_suffix('.md')
-    benchmarks = _benchmarks_from_status()
-    total_examples_planned = _plan_total_examples(benchmarks)
-    progress = ProgressTracker(
-        total_examples=total_examples_planned,
-        batch_size=DEFAULT_BATCH_SIZE,
-        max_batches=DEFAULT_MAX_ITERATIONS + 1,
+    args = parse_args()
+    benchmarks = args.benchmarks or benchmarks_from_status()
+    experiment = run_experiment(
+        benchmarks=benchmarks,
+        output_root=args.output_root,
+        samples_per_proportion=args.samples_per_proportion,
+        seed=args.seed,
+        limit=args.limit,
     )
-    rng = random.Random(RNG_SEED)
-    rows: list[dict[str, object]] = []
-    example_counter = 1
-
-    print(f'Running {len(benchmarks)} benchmarks (advanced + shallow + untyped) serially...', flush=True)
-    try:
-        for name in benchmarks:
-            benchmark_rows, example_counter = _run_benchmark(
-                name,
-                rng,
-                generated_at,
-                progress,
-                total_examples_planned,
-                example_counter,
-            )
-            rows.extend(benchmark_rows)
-            write_csv(rows, csv_path)
-            latest = write_report_from_csv(csv_path, report_path)
-            LATEST_REPORT.write_text(latest.read_text(encoding='utf-8'), encoding='utf-8')
-    finally:
-        progress.finish()
-
-    print(f'Wrote {csv_path}', flush=True)
-    print(f'Wrote {report_path}', flush=True)
-    print(f'Updated {LATEST_REPORT}', flush=True)
+    print(f'Wrote {experiment.root}', flush=True)
 
 
 if __name__ == '__main__':

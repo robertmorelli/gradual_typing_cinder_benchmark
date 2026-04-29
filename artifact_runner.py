@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
+import os
 import subprocess
-import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -24,12 +23,33 @@ class TimedRunResult:
     result: RunResult
 
 
+def _artifact_python_executable() -> str:
+    cinder_python = os.environ.get('CINDER_PYTHON')
+    if cinder_python:
+        return cinder_python
+
+    cinder_env = os.environ.get('CINDER_ENV')
+    if cinder_env:
+        candidate = Path(cinder_env) / 'bin' / 'python'
+        if candidate.exists():
+            return str(candidate)
+
+    local_candidate = Path('cinder_env/bin/python')
+    if local_candidate.exists():
+        return str(local_candidate)
+
+    raise RuntimeError(
+        'Could not find the Cinder Python runtime. Set CINDER_PYTHON or CINDER_ENV, '
+        'or run setup so cinder_env/bin/python exists.'
+    )
+
+
 def run_python_artifact(
     artifact_path: Path,
     label: str | None = None,
 ) -> RunResult:
     proc = subprocess.run(
-        [sys.executable, str(artifact_path)],
+        [_artifact_python_executable(), str(artifact_path)],
         capture_output=True,
         text=True,
     )
@@ -40,12 +60,6 @@ def run_python_artifact(
         stdout=proc.stdout,
         stderr=proc.stderr,
     )
-
-
-def write_run_result(result: RunResult, output_path: Path | None = None) -> Path:
-    target = output_path or Path(result.file).with_name(f'run_result_{result.label}.json')
-    target.write_text(json.dumps(asdict(result), indent=2, sort_keys=True) + '\n', encoding='utf-8')
-    return target
 
 
 def parse_stdout_time(stdout: str) -> float | None:
