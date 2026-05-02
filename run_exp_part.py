@@ -6,7 +6,9 @@ import argparse
 import csv
 import json
 import random
+import time
 from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from detyper.artifacts import load_source_artifacts
@@ -17,6 +19,7 @@ from run_experiment import OUTPUT_ROOT, RAW_FIELDS
 from setup_experiment import PLAN_PATH
 
 CHUNKS_PATH = OUTPUT_ROOT / 'chunks.json'
+ESTIMATE_PATH = OUTPUT_ROOT / 'estimate.json'
 
 RNG_SEED = 0
 
@@ -41,10 +44,12 @@ def load_plan(path: Path = PLAN_PATH) -> dict[str, dict[str, list[str]]]:
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+
+
 def load_chunks(path: Path = CHUNKS_PATH) -> dict[str, dict[str, int]]:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding='utf-8'))
+    return load_json(path)
 
 
 def chunk_count(chunks: dict[str, dict[str, int]], benchmark: str, variant: str) -> int:
@@ -101,6 +106,19 @@ def select_part(hexes: list[str], part: int | None, chunks: int | None, verbose:
     return hexes[start:stop]
 
 
+def eta_text(seconds: float) -> str:
+    seconds = max(0, round(seconds))
+    duration = str(timedelta(seconds=seconds))
+    when = datetime.now() + timedelta(seconds=seconds)
+    hour = when.hour % 12 or 12
+    return f'estimate: {duration} remaining; come back {when:%A, %b} {when.day} at {hour}:{when:%M %p}'
+
+
+def print_eta(seconds: float | None) -> None:
+    if seconds is not None and seconds > 0:
+        print(eta_text(seconds), flush=True)
+
+
 def run_part(benchmark: str, variant: str, part: int | None = None) -> None:
     plan = load_plan()
     chunks_config = load_chunks()
@@ -124,6 +142,9 @@ def run_part(benchmark: str, variant: str, part: int | None = None) -> None:
         source_path = resolve_benchmark_path(benchmark, variant=variant)
         total_detypable = len(load_source_artifacts(source_path).variant_names)
 
+    seconds_per_hex = load_json(ESTIMATE_PATH).get(benchmark, {}).get(variant)
+    print_eta(seconds_per_hex * len(hexes) if seconds_per_hex is not None else None)
+    started_at = time.monotonic()
     for index, hex_id in enumerate(hexes, start=1):
         print(f'{benchmark}/{variant}: {index}/{len(hexes)} {hex_id}', flush=True)
         artifact_path = write_detyped_file(benchmark, variant, hex_id)
@@ -141,6 +162,8 @@ def run_part(benchmark: str, variant: str, part: int | None = None) -> None:
             skip_typecheck=True,
         ))
         write_csv(raw_path, RAW_FIELDS, raw_rows)
+        if index < len(hexes):
+            print_eta((time.monotonic() - started_at) / index * (len(hexes) - index))
 
 
 def parse_args() -> argparse.Namespace:
