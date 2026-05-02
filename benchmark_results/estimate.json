@@ -1,0 +1,57 @@
+{
+  "call_method": {
+    "advanced": 0.145,
+    "shallow": 0.145,
+    "untyped": 0.002
+  },
+  "call_method_slots": {
+    "advanced": 0.143,
+    "shallow": 0.143,
+    "untyped": 0.002
+  },
+  "call_simple": {
+    "advanced": 0.022,
+    "shallow": 0.022,
+    "untyped": 0.0
+  },
+  "chaos": {
+    "advanced": 0.018,
+    "shallow": 0.018,
+    "untyped": 0.001
+  },
+  "deltablue": {
+    "advanced": 45.924,
+    "shallow": 47.552,
+    "untyped": 0.012
+  },
+  "fannkuch": {
+    "advanced": 0.007,
+    "shallow": 0.007,
+    "untyped": 0.004
+  },
+  "float": {
+    "advanced": 0.043,
+    "shallow": 0.011,
+    "untyped": 0.001
+  },
+  "nbody": {
+    "advanced": 0.425,
+    "shallow": 0.425,
+    "untyped": 0.007
+  },
+  "nqueens": {
+    "advanced": 0.014,
+    "shallow": 0.004,
+    "untyped": 0.0
+  },
+  "pystone": {
+    "advanced": 23.461,
+    "shallow": 23.461,
+    "untyped": 0.003
+  },
+  "richards": {
+    "advanced": 47.27,
+    "shallow": 47.27,
+    "untyped": 0.01
+  }
+}

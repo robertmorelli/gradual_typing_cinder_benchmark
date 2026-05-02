@@ -1,0 +1,57 @@
+{
+  "call_method": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "call_method_slots": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "call_simple": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "chaos": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "deltablue": {
+    "advanced": 8,
+    "shallow": 8,
+    "untyped": 1
+  },
+  "fannkuch": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "float": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "nbody": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "nqueens": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "pystone": {
+    "advanced": 1,
+    "shallow": 1,
+    "untyped": 1
+  },
+  "richards": {
+    "advanced": 4,
+    "shallow": 4,
+    "untyped": 1
+  }
+}
