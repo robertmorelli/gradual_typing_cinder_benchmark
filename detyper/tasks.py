@@ -48,6 +48,7 @@ IntentKind = Literal[
     'preserve_argument_mutations',
     'unwrap_checked_return_value',
     'wrap',
+    'unwrap_box',
 ]
 
 IntentionKey = tuple[int, int, IntentKind]
@@ -123,6 +124,10 @@ def make_wrap_intent(location: AST, context: AST, args: list[Arg], func_name: st
     return Intent('wrap', location, context, args, func_name)
 
 
+def make_unwrap_box_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
+    return Intent('unwrap_box', location, context, args, func_name)
+
+
 def _arg_marker(intent: Intent, arg: Arg) -> tuple:
     typ_key = ast.dump(arg.typ) if arg.typ is not None else 'None'
     if intent.kind == 'wrap':
@@ -154,6 +159,7 @@ INTENTION_EXECUTION_ORDER: list[IntentKind] = [
     'preserve_argument_mutations',
     'unwrap_checked_return_value',
     'wrap',
+    'unwrap_box',
 ]
 
 
@@ -217,7 +223,7 @@ def _apply_rewrite_param_binding(intent: Intent) -> None:
     for arg in sorted(intent.args, key=lambda item: item.index if item.index is not None else 0):
         idx = arg.index
         typ = arg.typ
-        if idx is None or idx >= len(node.args.args):
+        if idx is None or idx >= len(node.args.args) or typ is None:
             continue
 
         param = node.args.args[idx]
@@ -247,17 +253,17 @@ def _apply_rewrite_param_binding(intent: Intent) -> None:
                     func=ast.Name(id=type_name, ctx=ast.Load()),
                     args=[src], keywords=[],
                 )
+                if any(arg.typ is None for arg in intent.args if arg.index == idx):
+                    value = ast.Call(func=ast.Name(id='box', ctx=ast.Load()), args=[value], keywords=[])
             else:
                 value = ast.Call(
                     func=ast.Name(id='cast', ctx=ast.Load()),
                     args=[typ, src], keywords=[],
                 )
 
-            stmt = ast.AnnAssign(
-                target=ast.Name(id=orig_name, ctx=ast.Store()),
-                annotation=typ,
+            stmt = ast.Assign(
+                targets=[ast.Name(id=orig_name, ctx=ast.Store())],
                 value=value,
-                simple=1,
                 lineno=node.lineno, col_offset=node.col_offset,
             )
 
@@ -375,6 +381,19 @@ def _wrap_expr(expr: ast.expr, args: list[Arg]) -> ast.expr:
     return wrapped
 
 
+def _apply_unwrap_box(intent: Intent) -> None:
+    node = intent.location
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == 'box'
+        and len(node.args) == 1
+    ):
+        _SpecificNodeReplacer(id(node), node.args[0]).visit(intent.context)
+        return
+    raise TypeError(f'Unsupported node for unwrap_box: {type(node).__name__}')
+
+
 def _apply_wrap(intent: Intent) -> None:
     node = intent.location
     sorted_args = sorted(intent.args, key=lambda arg: arg.wrap_order)
@@ -387,6 +406,10 @@ def _apply_wrap(intent: Intent) -> None:
     if isinstance(node, ast.Return):
         if node.value is not None:
             node.value = _wrap_expr(node.value, sorted_args)
+        return
+
+    if isinstance(node, ast.Assign):
+        node.value = _wrap_expr(node.value, sorted_args)
         return
 
     if isinstance(node, ast.expr):
@@ -415,6 +438,9 @@ def apply_intent(intent: Intent) -> None:
         return
     if intent.kind == 'wrap':
         _apply_wrap(intent)
+        return
+    if intent.kind == 'unwrap_box':
+        _apply_unwrap_box(intent)
         return
     raise ValueError(f'Unknown intent kind: {intent.kind}')
 

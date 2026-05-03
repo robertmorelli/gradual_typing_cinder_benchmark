@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 TypeKind = Literal['none', 'builtin', 'primitive', 'checked_list', 'container', 'cast']
+CallBoundary = Literal['detyped_callee', 'typed_callee']
 EditName = Literal[
     'remove_annotation',
     'rewrite_param_binding',
@@ -25,6 +26,9 @@ EditName = Literal[
     'wrap_later_name_uses',
     'wrap_assigned_expression',
     'unwrap_checked_return_value',
+    'reproject_primitive_context_uses',
+    'unwrap_box_uses',
+    'box_primitive_storage_values',
 ]
 
 
@@ -33,7 +37,8 @@ class ParamPolicy:
     """All edits caused by a parameter annotation."""
 
     definition_edits: tuple[EditName, ...]
-    call_edits: tuple[EditName, ...]
+    detyped_callee_call_edits: tuple[EditName, ...]
+    typed_callee_call_edits: tuple[EditName, ...]
 
 
 @dataclass(frozen=True)
@@ -164,35 +169,41 @@ def classify_type(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = No
 PARAM_POLICIES: dict[TypeKind, ParamPolicy] = {
     'none': ParamPolicy(
         definition_edits=('remove_annotation',),
-        call_edits=(),
+        detyped_callee_call_edits=(),
+        typed_callee_call_edits=(),
     ),
     'builtin': ParamPolicy(
         definition_edits=('remove_annotation',),
-        call_edits=(),
+        detyped_callee_call_edits=(),
+        typed_callee_call_edits=(),
     ),
     'primitive': ParamPolicy(
-        definition_edits=('rewrite_param_binding',),
-        call_edits=('wrap_with_runtime_type', 'box'),
+        definition_edits=('rewrite_param_binding', 'box'),
+        detyped_callee_call_edits=('wrap_with_runtime_type', 'box'),
+        typed_callee_call_edits=('wrap_with_runtime_type',),
     ),
     'checked_list': ParamPolicy(
         definition_edits=('rewrite_param_binding',),
-        call_edits=('preserve_argument_mutations',),
+        detyped_callee_call_edits=('preserve_argument_mutations',),
+        typed_callee_call_edits=(),
     ),
     'container': ParamPolicy(
         definition_edits=('rewrite_param_binding',),
-        call_edits=('wrap_with_runtime_type',),
+        detyped_callee_call_edits=('wrap_with_runtime_type',),
+        typed_callee_call_edits=('wrap_with_runtime_type',),
     ),
     'cast': ParamPolicy(
         definition_edits=('rewrite_param_binding',),
-        call_edits=('wrap_with_runtime_type',),
+        detyped_callee_call_edits=('wrap_with_runtime_type',),
+        typed_callee_call_edits=('wrap_with_runtime_type',),
     ),
 }
 
 
 BODY_POLICIES: dict[TypeKind, BodyPolicy] = {
-    'none': BodyPolicy(annotation_edits=()),
+    'none': BodyPolicy(annotation_edits=('remove_annotation',)),
     'builtin': BodyPolicy(annotation_edits=('remove_annotation',)),
-    'primitive': BodyPolicy(annotation_edits=('wrap_assigned_expression',)),
+    'primitive': BodyPolicy(annotation_edits=('remove_annotation', 'reproject_primitive_context_uses', 'unwrap_box_uses', 'box_primitive_storage_values')),
     'checked_list': BodyPolicy(
         annotation_edits=('wrap_later_name_uses', 'remove_annotation', 'wrap_assigned_expression'),
     ),
@@ -242,6 +253,18 @@ RETURN_POLICIES: dict[TypeKind, ReturnPolicy] = {
 def param_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ParamPolicy:
     """Return the full policy caused by a parameter annotation."""
     return PARAM_POLICIES[classify_type(typ, aliases)]
+
+
+def param_call_edits_for(
+    typ: ast.expr | None,
+    boundary: CallBoundary,
+    aliases: dict[str, ast.expr] | None = None,
+) -> tuple[EditName, ...]:
+    """Return call-site edits for a parameter annotation at a boundary."""
+    policy = param_policy_for(typ, aliases)
+    if boundary == 'detyped_callee':
+        return policy.detyped_callee_call_edits
+    return policy.typed_callee_call_edits
 
 
 def body_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> BodyPolicy:

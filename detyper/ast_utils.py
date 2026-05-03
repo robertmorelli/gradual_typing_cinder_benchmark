@@ -109,12 +109,11 @@ def find_ann_assigns(func: FunctionDef) -> list[ast.AnnAssign]:
     return [node for node in _find_nodes_directly_in_function(func, ast.AnnAssign) if isinstance(node, ast.AnnAssign)]
 
 
-def find_name_uses_after(
+def _sibling_stmts_after(
     func: FunctionDef,
-    var_name: str,
     after_stmt: ast.stmt,
-) -> list[ast.Name]:
-    """All Load uses of var_name in sibling statements after after_stmt."""
+) -> list[ast.stmt]:
+    """Sibling statements that occur after after_stmt in the same statement list."""
 
     def _stmt_lists(node: ast.AST) -> list[list[ast.stmt]]:
         out: list[list[ast.stmt]] = []
@@ -139,6 +138,15 @@ def find_name_uses_after(
     if found is None:
         return []
     body, index = found
+    return body[index + 1:]
+
+
+def find_name_uses_after(
+    func: FunctionDef,
+    var_name: str,
+    after_stmt: ast.stmt,
+) -> list[ast.Name]:
+    """All Load uses of var_name in sibling statements after after_stmt."""
 
     results: list[ast.Name] = []
 
@@ -153,7 +161,33 @@ def find_name_uses_after(
             if node.id == var_name and isinstance(node.ctx, ast.Load):
                 results.append(node)
 
-    for stmt in body[index + 1:]:
+    for stmt in _sibling_stmts_after(func, after_stmt):
+        Visitor().visit(stmt)
+
+    return results
+
+
+def find_assigns_to_name_after(
+    func: FunctionDef,
+    var_name: str,
+    after_stmt: ast.stmt,
+) -> list[ast.Assign]:
+    """Plain assignments to var_name in sibling statements after after_stmt."""
+    results: list[ast.Assign] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node: FunctionDef) -> None:
+            return
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+        visit_ClassDef = visit_FunctionDef
+
+        def visit_Assign(self, node: ast.Assign) -> None:
+            if any(isinstance(target, ast.Name) and target.id == var_name for target in node.targets):
+                results.append(node)
+            self.generic_visit(node)
+
+    for stmt in _sibling_stmts_after(func, after_stmt):
         Visitor().visit(stmt)
 
     return results

@@ -21,6 +21,8 @@ class FuncInfo:
 class PlanData:
     funcs: dict[str, FuncInfo]
     aliases: dict[str, TypeSpec]
+    class_fields: dict[str, dict[str, TypeSpec]]
+    class_init_params: dict[str, list[TypeSpec | None]]
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
@@ -110,6 +112,52 @@ def _collect_type_aliases(module: Module) -> dict[str, TypeSpec]:
     return {name: expand_aliases(typ, aliases) or typ for name, typ in aliases.items()}
 
 
+def _collect_class_init_params(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, list[TypeSpec | None]]:
+    result: dict[str, list[TypeSpec | None]] = {}
+    classes = [stmt for stmt in module.body if isinstance(stmt, ast.ClassDef)]
+    bases: dict[str, str] = {}
+    for stmt in classes:
+        for base in stmt.bases:
+            if isinstance(base, ast.Name):
+                bases[stmt.name] = base.id
+                break
+        for item in stmt.body:
+            if isinstance(item, ast.FunctionDef) and item.name == '__init__':
+                result[stmt.name] = [
+                    expand_aliases(resolve_annotation(arg.annotation), aliases)
+                    for arg in item.args.args[1:]
+                ]
+                break
+    changed = True
+    while changed:
+        changed = False
+        for cls, base in bases.items():
+            if cls not in result and base in result:
+                result[cls] = result[base]
+                changed = True
+    return result
+
+
+def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, dict[str, TypeSpec]]:
+    fields: dict[str, dict[str, TypeSpec]] = {}
+    for stmt in module.body:
+        if not isinstance(stmt, ast.ClassDef):
+            continue
+        cls_fields: dict[str, TypeSpec] = {}
+        for node in ast.walk(stmt):
+            if (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Attribute)
+                and isinstance(node.target.value, ast.Name)
+                and node.target.value.id == 'self'
+            ):
+                typ = expand_aliases(resolve_annotation(node.annotation), aliases)
+                if typ is not None:
+                    cls_fields[node.target.attr] = typ
+        fields[stmt.name] = cls_fields
+    return fields
+
+
 def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     """Build PlanData from function defs and a permutation guide.
 
@@ -119,6 +167,8 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     can be skipped safely without discarding the whole function.
     """
     aliases = _collect_type_aliases(module)
+    class_fields = _collect_class_fields(module, aliases)
+    class_init_params = _collect_class_init_params(module, aliases)
     grouped: dict[str, list] = {}
     for fdef in defs:
         name = fdef.name
@@ -179,4 +229,4 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             is_detyped=is_detyped,
         )
 
-    return PlanData(funcs=funcs, aliases=aliases)
+    return PlanData(funcs=funcs, aliases=aliases, class_fields=class_fields, class_init_params=class_init_params)

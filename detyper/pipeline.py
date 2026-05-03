@@ -18,6 +18,7 @@ from .generators import (
 )
 from .plan_data import build_plan_data
 from .tasks import Detyper
+from .typecheck import decorate_ast_with_pyright
 
 Permutation = tuple[bool, ...]
 GuideType = dict[str, bool]
@@ -103,6 +104,7 @@ def build_detyped_program(
 ) -> DetypedProgram:
     """Apply the pure detyping transform for one permutation."""
     tree = ast.parse(source)
+    decorate_ast_with_pyright(tree, source)
     module = tree
 
     defs = all_function_defs(tree)
