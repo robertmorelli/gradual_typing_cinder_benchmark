@@ -1,0 +1,25 @@
+proportion,proportion_index,proportion_hex_id,batch_number,batch_index,run_length,stdout,stderr
+1.0,1,untyped,1,1,0.8629405498504639,"0.8629405498504639
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,2,0.8682708740234375,"0.8682708740234375
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,3,0.6818382740020752,"0.6818382740020752
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,4,0.7773613929748535,"0.7773613929748535
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,5,0.6983890533447266,"0.6983890533447266
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,6,0.6986057758331299,"0.6986057758331299
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,7,0.8694682121276855,"0.8694682121276855
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,untyped,1,8,0.904803991317749,"0.904803991317749
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
