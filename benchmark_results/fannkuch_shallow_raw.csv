@@ -1,0 +1,49 @@
+proportion,proportion_index,proportion_hex_id,batch_number,batch_index,run_length,stdout,stderr
+0.0,1,0x0,1,1,0.7883896827697754,"0.7883896827697754
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,2,0.675152063369751,"0.675152063369751
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,3,0.8573787212371826,"0.8573787212371826
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,4,0.8653264045715332,"0.8653264045715332
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,5,0.676746129989624,"0.676746129989624
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,6,0.70343017578125,"0.70343017578125
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,7,0.850712776184082,"0.850712776184082
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.0,1,0x0,1,8,0.7180478572845459,"0.7180478572845459
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,1,0.7836265563964844,"0.7836265563964844
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,2,0.7094039916992188,"0.7094039916992188
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,3,0.8316032886505127,"0.8316032886505127
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,4,0.8445212841033936,"0.8445212841033936
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,5,0.6860873699188232,"0.6860873699188232
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,6,0.7423977851867676,"0.7423977851867676
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,7,0.6831517219543457,"0.6831517219543457
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+1.0,1,0x1,1,8,0.7168185710906982,"0.7168185710906982
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
