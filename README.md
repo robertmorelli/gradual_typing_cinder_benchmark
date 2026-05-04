@@ -32,12 +32,23 @@ reminder of TMUX stuff:
 ```bash
 tmux new -s work
 ```
+then log in to gh:
+```bash
+gh auth login
+```
+make docker not broken
+```bash
+newgrp docker
+```
+
 press `Ctrl-b` then `d` to leave then to come back:
 ```bash
 tmux attach -t work
 ```
-Dont forget to commit results
-
+Dont forget to commit results:
+```bash
+git pull --rebase && git add benchmark_results/ && git commit -m "<message>" && git push
+```
 
 Finish up experiment (anywhere):
 ```bash
