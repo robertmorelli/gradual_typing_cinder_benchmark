@@ -1,22 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-# sudo apt-get upgrade
-# sudo apt-get install -y libz-dev
+# Force IPv4 for apt and swap to a more reliable mirror before doing anything
+echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4 > /dev/null
+sudo sed -i 's|us.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/sources.list
+sudo sed -i 's|//.*archive.ubuntu.com|//archive.ubuntu.com|g' /etc/apt/sources.list.d/*.list 2>/dev/null || true
 
 # Remove any conflicting Docker packages that might be installed
 for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
-    sudo apt-get remove -y "$pkg" || true
+    if dpkg -l "$pkg" &>/dev/null; then
+        sudo apt-get remove -y "$pkg"
+    fi
 done
 
-# Add Docker's official GPG key:
+# Add Docker's official GPG key
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Add the repository to Apt sources:
+# Add Docker repository to apt sources
 arch=$(dpkg --print-architecture)
 codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" \
@@ -36,7 +40,7 @@ if ! command -v go &>/dev/null; then
     fi
 fi
 
-# Install GitHub CLI from the official apt repository.
+# Install GitHub CLI
 sudo mkdir -p -m 755 /etc/apt/keyrings
 wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
