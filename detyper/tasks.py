@@ -10,6 +10,11 @@ from typing import Literal, NamedTuple
 from .rules import classify_type
 
 
+def _node_id(node: AST) -> int:
+    """Stable node id assigned by ast_utils.label_tree; fallback for tests."""
+    return getattr(node, 'detyping_id', id(node))
+
+
 def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
     """Return a new AST node wrapping expr for the given type."""
     kind = classify_type(typ)
@@ -57,24 +62,42 @@ NodeCollisionKey = tuple[int, int]
 
 @dataclass
 class Intent:
+    """Serializable intent spec: node references are deterministic ids only."""
+
     kind: IntentKind
-    location: AST
-    context: AST
+    location_id: int
+    context_id: int
     args: list[Arg]
     func_name: str
+    lineno: int = 0
+    col_offset: int = 0
+    node_kind: str = ''
 
     def key(self) -> IntentionKey:
-        return (id(self.location), id(self.context), self.kind)
+        return (self.location_id, self.context_id, self.kind)
 
     def node_collision_key(self) -> NodeCollisionKey:
-        return (id(self.location), id(self.context))
+        return (self.location_id, self.context_id)
 
     @property
-    def sort_key(self) -> tuple[str, int, int, str, int]:
-        return build_sort_key(self.func_name, self.location, self.kind)
+    def sort_key(self) -> tuple[str, int, int, str, int, int]:
+        return (self.func_name, self.lineno, self.col_offset, self.node_kind, self.location_id, _precedence_index(self.kind))
 
     def clone(self) -> 'Intent':
-        return Intent(self.kind, self.location, self.context, list(self.args), self.func_name)
+        return Intent(self.kind, self.location_id, self.context_id, list(self.args), self.func_name, self.lineno, self.col_offset, self.node_kind)
+
+
+def _make_intent(kind: IntentKind, location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
+    return Intent(
+        kind=kind,
+        location_id=_node_id(location),
+        context_id=_node_id(context),
+        args=args,
+        func_name=func_name,
+        lineno=getattr(location, 'lineno', 0) or 0,
+        col_offset=getattr(location, 'col_offset', 0) or 0,
+        node_kind=location.__class__.__name__,
+    )
 
 
 class _SpecificNodeReplacer(ast.NodeTransformer):
@@ -105,27 +128,27 @@ class _SpecificNodeReplacer(ast.NodeTransformer):
 
 
 def make_remove_annotation_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('remove_annotation', location, context, args, func_name)
+    return _make_intent('remove_annotation', location, context, args, func_name)
 
 
 def make_rewrite_param_binding_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('rewrite_param_binding', location, context, args, func_name)
+    return _make_intent('rewrite_param_binding', location, context, args, func_name)
 
 
 def make_preserve_argument_mutations_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('preserve_argument_mutations', location, context, args, func_name)
+    return _make_intent('preserve_argument_mutations', location, context, args, func_name)
 
 
 def make_unwrap_checked_return_value_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('unwrap_checked_return_value', location, context, args, func_name)
+    return _make_intent('unwrap_checked_return_value', location, context, args, func_name)
 
 
 def make_wrap_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('wrap', location, context, args, func_name)
+    return _make_intent('wrap', location, context, args, func_name)
 
 
 def make_unwrap_box_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return Intent('unwrap_box', location, context, args, func_name)
+    return _make_intent('unwrap_box', location, context, args, func_name)
 
 
 def _arg_marker(intent: Intent, arg: Arg) -> tuple:
@@ -173,11 +196,11 @@ def build_sort_key(
     func_name: str,
     location: AST,
     intent_kind: IntentKind,
-) -> tuple[str, int, int, str, int]:
+) -> tuple[str, int, int, str, int, int]:
     lineno = getattr(location, 'lineno', 0) or 0
     col_offset = getattr(location, 'col_offset', 0) or 0
     node_kind = location.__class__.__name__
-    return (func_name, lineno, col_offset, node_kind, _precedence_index(intent_kind))
+    return (func_name, lineno, col_offset, node_kind, _node_id(location), _precedence_index(intent_kind))
 
 
 def resolve_same_node_intentions(intentions: list[Intent]) -> list[Intent]:
@@ -198,8 +221,8 @@ def resolve_same_node_intentions(intentions: list[Intent]) -> list[Intent]:
     return sorted(canonical_by_kind.values(), key=lambda intent: intent.sort_key)
 
 
-def _apply_remove_annotation(intent: Intent) -> None:
-    node = intent.location
+def _apply_remove_annotation(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     if isinstance(node, FunctionDef):
         for arg in intent.args:
             if arg.index is None:
@@ -215,8 +238,8 @@ def _apply_remove_annotation(intent: Intent) -> None:
     raise TypeError(f'Unsupported node for remove_annotation: {type(node).__name__}')
 
 
-def _apply_rewrite_param_binding(intent: Intent) -> None:
-    node = intent.location
+def _apply_rewrite_param_binding(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     assert isinstance(node, FunctionDef)
     prepend: list[ast.stmt] = []
 
@@ -272,11 +295,12 @@ def _apply_rewrite_param_binding(intent: Intent) -> None:
     node.body = prepend + node.body
 
 
-def _apply_preserve_argument_mutations(intent: Intent) -> None:
-    node = intent.location
+def _apply_preserve_argument_mutations(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     assert isinstance(node, ast.Call)
-    assert isinstance(intent.context, ast.Module)
-    mod_body = intent.context.body
+    context = nodes[intent.context_id]
+    assert isinstance(context, ast.Module)
+    mod_body = context.body
 
     insert_idx = 0
     for i, stmt in enumerate(mod_body):
@@ -364,8 +388,8 @@ def _apply_preserve_argument_mutations(intent: Intent) -> None:
     node.args = [callee_expr] + original_args
 
 
-def _apply_unwrap_checked_return_value(intent: Intent) -> None:
-    node = intent.location
+def _apply_unwrap_checked_return_value(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     assert isinstance(node, ast.Return)
     if node.value is not None:
         value = node.value
@@ -381,21 +405,21 @@ def _wrap_expr(expr: ast.expr, args: list[Arg]) -> ast.expr:
     return wrapped
 
 
-def _apply_unwrap_box(intent: Intent) -> None:
-    node = intent.location
+def _apply_unwrap_box(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     if (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == 'box'
         and len(node.args) == 1
     ):
-        _SpecificNodeReplacer(id(node), node.args[0]).visit(intent.context)
+        _SpecificNodeReplacer(id(node), node.args[0]).visit(nodes[intent.context_id])
         return
     raise TypeError(f'Unsupported node for unwrap_box: {type(node).__name__}')
 
 
-def _apply_wrap(intent: Intent) -> None:
-    node = intent.location
+def _apply_wrap(intent: Intent, nodes: dict[int, AST]) -> None:
+    node = nodes[intent.location_id]
     sorted_args = sorted(intent.args, key=lambda arg: arg.wrap_order)
 
     if isinstance(node, ast.AnnAssign):
@@ -416,33 +440,70 @@ def _apply_wrap(intent: Intent) -> None:
         expr: ast.expr = ast.Name(id=node.id, ctx=ast.Load()) if isinstance(node, ast.Name) else node
         expr = _wrap_expr(expr, sorted_args)
         ast.copy_location(expr, node)
-        _SpecificNodeReplacer(id(node), expr).visit(intent.context)
+        _SpecificNodeReplacer(id(node), expr).visit(nodes[intent.context_id])
         return
 
     raise TypeError(f'Unsupported node for wrap: {type(node).__name__}')
 
 
-def apply_intent(intent: Intent) -> None:
+def apply_intent(intent: Intent, nodes: dict[int, AST]) -> None:
     """Apply one canonical intent to the AST."""
     if intent.kind == 'remove_annotation':
-        _apply_remove_annotation(intent)
+        _apply_remove_annotation(intent, nodes)
         return
     if intent.kind == 'rewrite_param_binding':
-        _apply_rewrite_param_binding(intent)
+        _apply_rewrite_param_binding(intent, nodes)
         return
     if intent.kind == 'preserve_argument_mutations':
-        _apply_preserve_argument_mutations(intent)
+        _apply_preserve_argument_mutations(intent, nodes)
         return
     if intent.kind == 'unwrap_checked_return_value':
-        _apply_unwrap_checked_return_value(intent)
+        _apply_unwrap_checked_return_value(intent, nodes)
         return
     if intent.kind == 'wrap':
-        _apply_wrap(intent)
+        _apply_wrap(intent, nodes)
         return
     if intent.kind == 'unwrap_box':
-        _apply_unwrap_box(intent)
+        _apply_unwrap_box(intent, nodes)
         return
     raise ValueError(f'Unknown intent kind: {intent.kind}')
+
+
+def _typ_to_json(typ: ast.expr | None) -> str | None:
+    return ast.unparse(typ) if typ is not None else None
+
+
+def _typ_from_json(text: str | None) -> ast.expr | None:
+    return ast.parse(text, mode='eval').body if text is not None else None
+
+
+def intent_to_json(intent: Intent) -> dict:
+    return {
+        'kind': intent.kind,
+        'location_id': intent.location_id,
+        'context_id': intent.context_id,
+        'args': [
+            {'index': arg.index, 'typ': _typ_to_json(arg.typ), 'wrap_order': arg.wrap_order}
+            for arg in intent.args
+        ],
+        'func_name': intent.func_name,
+        'lineno': intent.lineno,
+        'col_offset': intent.col_offset,
+        'node_kind': intent.node_kind,
+    }
+
+
+def intent_from_json(data: dict) -> Intent:
+    return Intent(
+        kind=data['kind'],
+        location_id=data['location_id'],
+        context_id=data['context_id'],
+        args=[Arg(arg['index'], _typ_from_json(arg['typ']), arg.get('wrap_order', 0)) for arg in data['args']],
+        func_name=data['func_name'],
+        lineno=data.get('lineno', 0),
+        col_offset=data.get('col_offset', 0),
+        node_kind=data.get('node_kind', ''),
+    )
 
 
 class Detyper:
@@ -464,6 +525,9 @@ class Detyper:
             result.add(intention.clone())
         return result
 
+    def intentions(self) -> list[Intent]:
+        return [intent.clone() for intent in self._intentions]
+
     def _sorted_tasks(self) -> list[Intent]:
         by_node: dict[NodeCollisionKey, list[Intent]] = {}
         for intention in self._intentions:
@@ -475,6 +539,6 @@ class Detyper:
 
         return sorted(canonicalized, key=lambda intention: intention.sort_key)
 
-    def execute(self) -> None:
+    def execute(self, nodes: dict[int, AST]) -> None:
         for intention in self._sorted_tasks():
-            apply_intent(intention)
+            apply_intent(intention, nodes)

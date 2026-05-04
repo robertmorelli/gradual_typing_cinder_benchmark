@@ -23,6 +23,7 @@ class PlanData:
     aliases: dict[str, TypeSpec]
     class_fields: dict[str, dict[str, TypeSpec]]
     class_init_params: dict[str, list[TypeSpec | None]]
+    selected_annotation_ids: set[int] | None = None
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
@@ -158,6 +159,19 @@ def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[
     return fields
 
 
+def _function_annotation_ids(fdef: FunctionDef) -> set[int]:
+    ids: set[int] = set()
+    for arg in fdef.args.args:
+        if arg.annotation is not None:
+            ids.add(arg.detyping_id)
+    if fdef.returns is not None:
+        ids.add(fdef.detyping_id)
+    for node in ast.walk(fdef):
+        if isinstance(node, ast.AnnAssign) and node.annotation is not None:
+            ids.add(node.detyping_id)
+    return ids
+
+
 def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     """Build PlanData from function defs and a permutation guide.
 
@@ -221,7 +235,12 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             for fdef in fdefs
             for d in fdef.decorator_list
         )
-        is_detyped = (not has_inline) and guide.get(name, False)
+        selected_annotation_ids = {key for key, value in guide.items() if isinstance(key, int) and value}
+        if selected_annotation_ids:
+            is_detyped = (not has_inline) and any(_function_annotation_ids(fdef) & selected_annotation_ids for fdef in fdefs)
+        else:
+            selected_annotation_ids = None
+            is_detyped = (not has_inline) and guide.get(name, False)
         funcs[name] = FuncInfo(
             fun_name=name,
             param_types=param_types,
@@ -229,4 +248,10 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             is_detyped=is_detyped,
         )
 
-    return PlanData(funcs=funcs, aliases=aliases, class_fields=class_fields, class_init_params=class_init_params)
+    return PlanData(
+        funcs=funcs,
+        aliases=aliases,
+        class_fields=class_fields,
+        class_init_params=class_init_params,
+        selected_annotation_ids=selected_annotation_ids,
+    )

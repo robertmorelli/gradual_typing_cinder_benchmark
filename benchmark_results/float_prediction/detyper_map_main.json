@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "annotation_ids": [
+    "78",
+    "80",
+    "83",
+    "92",
+    "101",
+    "110",
+    "165",
+    "167",
+    "170",
+    "252",
+    "254",
+    "261",
+    "295",
+    "297"
+  ],
+  "bundles": {
+    "78": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 78,
+        "context_id": 78,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 24,
+        "col_offset": 4,
+        "node_kind": "FunctionDef"
+      }
+    ],
+    "80": [
+      {
+        "kind": "rewrite_param_binding",
+        "location_id": 78,
+        "context_id": 78,
+        "args": [
+          {
+            "index": 0,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 24,
+        "col_offset": 4,
+        "node_kind": "FunctionDef"
+      }
+    ],
+    "83": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 83,
+        "context_id": 78,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 25,
+        "col_offset": 8,
+        "node_kind": "AnnAssign"
+      }
+    ],
+    "92": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 92,
+        "context_id": 78,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 26,
+        "col_offset": 8,
+        "node_kind": "AnnAssign"
+      }
+    ],
+    "101": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 101,
+        "context_id": 78,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 27,
+        "col_offset": 8,
+        "node_kind": "AnnAssign"
+      }
+    ],
+    "110": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 110,
+        "context_id": 78,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normalize",
+        "lineno": 28,
+        "col_offset": 8,
+        "node_kind": "AnnAssign"
+      }
+    ],
+    "165": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 165,
+        "context_id": 165,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize",
+        "lineno": 33,
+        "col_offset": 4,
+        "node_kind": "FunctionDef"
+      },
+      {
+        "kind": "wrap",
+        "location_id": 283,
+        "context_id": 252,
+        "args": [
+          {
+            "index": null,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 42,
+        "col_offset": 15,
+        "node_kind": "Call"
+      }
+    ],
+    "167": [
+      {
+        "kind": "rewrite_param_binding",
+        "location_id": 165,
+        "context_id": 165,
+        "args": [
+          {
+            "index": 0,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize",
+        "lineno": 33,
+        "col_offset": 4,
+        "node_kind": "FunctionDef"
+      }
+    ],
+    "170": [
+      {
+        "kind": "rewrite_param_binding",
+        "location_id": 165,
+        "context_id": 165,
+        "args": [
+          {
+            "index": 1,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize",
+        "lineno": 33,
+        "col_offset": 4,
+        "node_kind": "FunctionDef"
+      },
+      {
+        "kind": "wrap",
+        "location_id": 288,
+        "context_id": 252,
+        "args": [
+          {
+            "index": null,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 42,
+        "col_offset": 29,
+        "node_kind": "Name"
+      }
+    ],
+    "252": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 252,
+        "context_id": 252,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 39,
+        "col_offset": 0,
+        "node_kind": "FunctionDef"
+      },
+      {
+        "kind": "wrap",
+        "location_id": 328,
+        "context_id": 322,
+        "args": [
+          {
+            "index": null,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "benchmark",
+        "lineno": 52,
+        "col_offset": 11,
+        "node_kind": "Call"
+      }
+    ],
+    "254": [
+      {
+        "kind": "rewrite_param_binding",
+        "location_id": 252,
+        "context_id": 252,
+        "args": [
+          {
+            "index": 0,
+            "typ": "CheckedList[Point]",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 39,
+        "col_offset": 0,
+        "node_kind": "FunctionDef"
+      },
+      {
+        "kind": "preserve_argument_mutations",
+        "location_id": 328,
+        "context_id": 0,
+        "args": [
+          {
+            "index": 0,
+            "typ": "CheckedList[Point]",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "benchmark",
+        "lineno": 52,
+        "col_offset": 11,
+        "node_kind": "Call"
+      }
+    ],
+    "261": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 261,
+        "context_id": 252,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 40,
+        "col_offset": 4,
+        "node_kind": "AnnAssign"
+      },
+      {
+        "kind": "wrap",
+        "location_id": 261,
+        "context_id": 252,
+        "args": [
+          {
+            "index": null,
+            "typ": "Point",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "maximize_all",
+        "lineno": 40,
+        "col_offset": 4,
+        "node_kind": "AnnAssign"
+      }
+    ],
+    "295": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 295,
+        "context_id": 295,
+        "args": [
+          {
+            "index": null,
+            "typ": null,
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normal_point",
+        "lineno": 45,
+        "col_offset": 0,
+        "node_kind": "FunctionDef"
+      }
+    ],
+    "297": [
+      {
+        "kind": "remove_annotation",
+        "location_id": 295,
+        "context_id": 295,
+        "args": [
+          {
+            "index": 0,
+            "typ": "int",
+            "wrap_order": 0
+          }
+        ],
+        "func_name": "normal_point",
+        "lineno": 45,
+        "col_offset": 0,
+        "node_kind": "FunctionDef"
+      }
+    ]
+  }
+}

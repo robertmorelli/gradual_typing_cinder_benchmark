@@ -7,6 +7,32 @@ from ast import AST, Call, FunctionDef
 from typing import Callable
 
 
+def node_index(tree: AST) -> dict[int, AST]:
+    """Map deterministic node ids to AST nodes."""
+    return {node.detyping_id: node for node in ast.walk(tree) if hasattr(node, 'detyping_id')}
+
+
+def label_tree(tree: AST) -> None:
+    """Attach deterministic preorder ids and parent ids to every AST node."""
+    next_id = 0
+
+    def visit(node: AST, parent_id: int | None = None) -> None:
+        nonlocal next_id
+        node.detyping_id = next_id
+        node.parent_detyping_id = parent_id
+        node.detyping_span = (
+            getattr(node, 'lineno', None),
+            getattr(node, 'col_offset', None),
+            getattr(node, 'end_lineno', None),
+            getattr(node, 'end_col_offset', None),
+        )
+        next_id += 1
+        current_id = node.detyping_id
+        for child in ast.iter_child_nodes(node):
+            visit(child, current_id)
+
+    visit(tree)
+
 
 class _FunctionCollector(ast.NodeVisitor):
     def __init__(self):
@@ -32,6 +58,32 @@ def detypable_function_names(source: str) -> list[str]:
         f.name for f in all_function_defs(tree)
         if not (f.name.startswith('__') and f.name.endswith('__'))
     })
+
+
+def detypable_annotation_ids(source: str) -> list[str]:
+    """Return deterministic annotation ids that participate in permutations."""
+    tree = ast.parse(source)
+    label_tree(tree)
+    ids: list[int] = []
+    for fdef in all_function_defs(tree):
+        if fdef.name.startswith('__') and fdef.name.endswith('__'):
+            continue
+        has_inline = any(
+            (isinstance(d, ast.Name) and d.id == 'inline') or
+            (isinstance(d, ast.Attribute) and d.attr == 'inline')
+            for d in fdef.decorator_list
+        )
+        if has_inline:
+            continue
+        for arg in fdef.args.args:
+            if arg.annotation is not None:
+                ids.append(arg.detyping_id)
+        if fdef.returns is not None:
+            ids.append(fdef.detyping_id)
+        for node in ast.walk(fdef):
+            if isinstance(node, ast.AnnAssign) and node.annotation is not None:
+                ids.append(node.detyping_id)
+    return [str(item) for item in sorted(set(ids))]
 
 
 class _CallUseCollector(ast.NodeVisitor):

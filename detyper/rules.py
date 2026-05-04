@@ -275,3 +275,18 @@ def body_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = 
 def return_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ReturnPolicy:
     """Return the full policy caused by a return annotation."""
     return RETURN_POLICIES[classify_type(typ, aliases)]
+
+
+def primitive_intrinsic_return_type(name: str) -> ast.expr | None:
+    """Primitive return facts for Static Python intrinsics used by policies."""
+    if name == 'clen':
+        return ast.Name(id='int64', ctx=ast.Load())
+    return None
+
+
+def container_element_type(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ast.expr | None:
+    """Return element type for primitive-aware static containers."""
+    typ = expand_aliases(typ, aliases)
+    if isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in CONTAINER_NAMES:
+        return typ.slice
+    return None

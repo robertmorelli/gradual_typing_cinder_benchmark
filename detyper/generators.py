@@ -5,7 +5,7 @@ from ast import FunctionDef, Module
 
 from .ast_utils import find_ann_assigns, find_assigns_to_name_after, find_name_uses_after, find_returns
 from .plan_data import FuncInfo, PlanData
-from .rules import EditName, body_policy_for, classify_type, expand_aliases, param_call_edits_for, param_policy_for, return_policy_for
+from .rules import EditName, body_policy_for, classify_type, container_element_type, expand_aliases, param_call_edits_for, param_policy_for, primitive_intrinsic_return_type, return_policy_for
 from .tasks import (
     Arg,
     Detyper,
@@ -62,6 +62,10 @@ def _wrap_args_for(actions: tuple[EditName, ...], typ: ast.expr | None) -> list[
     return wrap_args
 
 
+def _annotation_selected(plan: PlanData, node: ast.AST) -> bool:
+    return plan.selected_annotation_ids is None or node.detyping_id in plan.selected_annotation_ids
+
+
 def generate_tasks_params_definition(
     node: FunctionDef,
     plan: PlanData,
@@ -75,6 +79,8 @@ def generate_tasks_params_definition(
     for idx, param in enumerate(node.args.args):
         typ = info.param_types[idx] if idx < len(info.param_types) else None
         if typ is None and param.annotation is None:
+            continue
+        if param.annotation is not None and not _annotation_selected(plan, param):
             continue
 
         policy = param_policy_for(typ, plan.aliases)
@@ -115,6 +121,11 @@ def generate_tasks_params_calls(
     result: list[Detyper] = []
 
     for idx, typ in enumerate(info.param_types):
+        if typ is None:
+            continue
+        for fdef_arg in node.args.args[idx:idx + 1]:
+            if fdef_arg.annotation is not None and not _annotation_selected(plan, fdef_arg):
+                typ = None
         if typ is None:
             continue
         boundary = 'detyped_callee' if info.is_detyped else 'typed_callee'
@@ -180,8 +191,9 @@ def _local_subscript_value_types(func: FunctionDef, plan: PlanData) -> dict[str,
         if not isinstance(ann.target, ast.Name):
             continue
         typ = expand_aliases(ann.annotation, plan.aliases)
-        if isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in ('Array', 'Vector'):
-            result[ann.target.id] = typ.slice
+        element_type = container_element_type(typ, plan.aliases)
+        if element_type is not None:
+            result[ann.target.id] = element_type
     return result
 
 
@@ -199,8 +211,10 @@ def generate_tasks_body(
     local_primitive_assign_types: dict[str, ast.expr] = {}
     for assign in ast.walk(node):
         if isinstance(assign, ast.Assign) and len(assign.targets) == 1 and isinstance(assign.targets[0], ast.Name):
-            if isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name) and assign.value.func.id == 'clen':
-                local_primitive_assign_types[assign.targets[0].id] = ast.Name(id='int64', ctx=ast.Load())
+            if isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name):
+                primitive_return = primitive_intrinsic_return_type(assign.value.func.id)
+                if primitive_return is not None:
+                    local_primitive_assign_types[assign.targets[0].id] = primitive_return
 
     for call in ast.walk(node):
         if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id in plan.class_init_params:
@@ -249,6 +263,20 @@ def generate_tasks_body(
                     if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load) and sub.id in primitive_context_locals:
                         result.append(Detyper(make_wrap_intent(sub, node, [Arg(None, primitive_context_locals[sub.id], wrap_order=0)], node.name)))
         for call in ast.walk(node):
+            if not isinstance(call, ast.Call):
+                continue
+            callee_name = None
+            if isinstance(call.func, ast.Name):
+                callee_name = call.func.id
+            elif isinstance(call.func, ast.Attribute):
+                callee_name = call.func.attr
+            callee_info = plan.funcs.get(callee_name) if callee_name is not None else None
+            if callee_info is not None:
+                for idx, arg_expr in enumerate(call.args):
+                    if idx < len(callee_info.param_types) and isinstance(arg_expr, ast.Name) and arg_expr.id in primitive_context_locals:
+                        param_type = callee_info.param_types[idx]
+                        if classify_type(param_type, plan.aliases) == 'primitive':
+                            result.append(Detyper(make_wrap_intent(arg_expr, node, [Arg(None, param_type, wrap_order=0)], node.name)))
             if (
                 isinstance(call, ast.Call)
                 and isinstance(call.func, ast.Name)
@@ -277,8 +305,9 @@ def generate_tasks_body(
             as_type = ast.Name(id=expr.func.id, ctx=ast.Load())
             if classify_type(as_type, plan.aliases) == 'primitive':
                 return as_type
-            if expr.func.id == 'clen':
-                return ast.Name(id='int64', ctx=ast.Load())
+            primitive_return = primitive_intrinsic_return_type(expr.func.id)
+            if primitive_return is not None:
+                return primitive_return
         if isinstance(expr, ast.Attribute):
             return primitive_field_types.get(expr.attr)
         if isinstance(expr, ast.Subscript) and isinstance(expr.value, ast.Name):
@@ -307,6 +336,8 @@ def generate_tasks_body(
                 result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, field_typ, wrap_order=0)], node.name)))
 
     for ann in find_ann_assigns(node):
+        if not _annotation_selected(plan, ann):
+            continue
         typ = expand_aliases(ann.annotation, plan.aliases)
         policy = body_policy_for(typ, plan.aliases)
         actions = policy.annotation_edits
@@ -333,7 +364,7 @@ def generate_tasks_body(
                         if isinstance(assign.value, ast.BinOp):
                             result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, value_typ, wrap_order=0)], node.name)))
                         elif not (isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name) and assign.value.func.id == 'box') and not (isinstance(assign.value, ast.Name) and assign.value.id in primitive_context_locals):
-                            result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=0)], node.name)))
+                            result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
         if 'wrap_assigned_expression' in actions:
             result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, typ, wrap_order=0)], node.name)))
 
@@ -356,7 +387,7 @@ def generate_tasks_body(
             if isinstance(target, ast.Name) and target.id in primitive_context_locals:
                 value_typ = primitive_expr_type(assign.value)
                 if value_typ is not None and not (isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name) and assign.value.func.id == 'box') and not (isinstance(assign.value, ast.Name) and assign.value.id in primitive_context_locals):
-                    result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=0)], node.name)))
+                    result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
 
     return result
 
@@ -370,6 +401,8 @@ def generate_tasks_return_definition(
         return []
 
     ret_typ = info.return_type
+    if node.returns is not None and not _annotation_selected(plan, node):
+        return []
     if ret_typ is None and node.returns is not None:
         ret_typ = node.returns
     policy = return_policy_for(ret_typ, plan.aliases)
@@ -393,6 +426,8 @@ def generate_tasks_return_calls(
         return []
 
     ret_typ = info.return_type
+    if node.returns is not None and not _annotation_selected(plan, node):
+        return []
     policy = return_policy_for(ret_typ, plan.aliases)
     value_actions = policy.value_edits
     call_actions = policy.call_edits

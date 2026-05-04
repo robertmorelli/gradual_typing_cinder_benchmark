@@ -1,0 +1,2502 @@
+[
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x0",
+    "runtime": 0.3485560417175293,
+    "all_runs": [
+      0.3567202091217041,
+      0.3530869483947754,
+      0.3485560417175293
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x3fff",
+    "runtime": 0.584080696105957,
+    "all_runs": [
+      0.584080696105957,
+      0.5924592018127441,
+      0.6097331047058105
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x1c7b",
+    "runtime": 0.5448744297027588,
+    "all_runs": [
+      0.547518253326416,
+      0.5503664016723633,
+      0.5448744297027588
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x937",
+    "runtime": 0.43876147270202637,
+    "all_runs": [
+      0.44463253021240234,
+      0.43876147270202637,
+      0.44678688049316406
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x81",
+    "runtime": 0.3973867893218994,
+    "all_runs": [
+      0.4011523723602295,
+      0.39952993392944336,
+      0.3973867893218994
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x3f78",
+    "runtime": 0.5405006408691406,
+    "all_runs": [
+      0.5487477779388428,
+      0.5440104007720947,
+      0.5405006408691406
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x2c0f",
+    "runtime": 0.362368106842041,
+    "all_runs": [
+      0.36612677574157715,
+      0.3743593692779541,
+      0.362368106842041
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x2574",
+    "runtime": 0.4888174533843994,
+    "all_runs": [
+      0.49941205978393555,
+      0.4953436851501465,
+      0.4888174533843994
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x339c",
+    "runtime": 0.4628481864929199,
+    "all_runs": [
+      0.4628481864929199,
+      0.4648711681365967,
+      0.4697086811065674
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x8b9",
+    "runtime": 0.4907970428466797,
+    "all_runs": [
+      0.5066933631896973,
+      0.4907970428466797,
+      0.5004720687866211
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x1243",
+    "runtime": 0.44272613525390625,
+    "all_runs": [
+      0.44272613525390625,
+      0.4430222511291504,
+      0.4456346035003662
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x2339",
+    "runtime": 0.4513537883758545,
+    "all_runs": [
+      0.4672982692718506,
+      0.4513537883758545,
+      0.45660400390625
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x2b32",
+    "runtime": 0.4471402168273926,
+    "all_runs": [
+      0.4474484920501709,
+      0.4484992027282715,
+      0.4471402168273926
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x3ba6",
+    "runtime": 0.5310299396514893,
+    "all_runs": [
+      0.5427732467651367,
+      0.5435223579406738,
+      0.5310299396514893
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x327c",
+    "runtime": 0.5422861576080322,
+    "all_runs": [
+      0.5549476146697998,
+      0.5422861576080322,
+      0.5566363334655762
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x1dfa",
+    "runtime": 0.5892722606658936,
+    "all_runs": [
+      0.5929090976715088,
+      0.5981059074401855,
+      0.5892722606658936
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x107e",
+    "runtime": 0.5449891090393066,
+    "all_runs": [
+      0.5749704837799072,
+      0.5457234382629395,
+      0.5449891090393066
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x2c30",
+    "runtime": 0.44747471809387207,
+    "all_runs": [
+      0.46843600273132324,
+      0.44747471809387207,
+      0.45644044876098633
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x22cd",
+    "runtime": 0.4549291133880615,
+    "all_runs": [
+      0.4549291133880615,
+      0.4619028568267822,
+      0.46431827545166016
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x8b6",
+    "runtime": 0.4875760078430176,
+    "all_runs": [
+      0.4885141849517822,
+      0.4901092052459717,
+      0.4875760078430176
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x338c",
+    "runtime": 0.4633829593658447,
+    "all_runs": [
+      0.46512484550476074,
+      0.4633829593658447,
+      0.48847389221191406
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x53a",
+    "runtime": 0.4489762783050537,
+    "all_runs": [
+      0.4497096538543701,
+      0.4489762783050537,
+      0.4596073627471924
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x1679",
+    "runtime": 0.5418863296508789,
+    "all_runs": [
+      0.5526933670043945,
+      0.5418863296508789,
+      0.558819055557251
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0xe0e",
+    "runtime": 0.36554574966430664,
+    "all_runs": [
+      0.36623048782348633,
+      0.36554574966430664,
+      0.3659322261810303
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x728",
+    "runtime": 0.45328474044799805,
+    "all_runs": [
+      0.4540741443634033,
+      0.45328474044799805,
+      0.45429420471191406
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0xa14",
+    "runtime": 0.34862709045410156,
+    "all_runs": [
+      0.35082149505615234,
+      0.34862709045410156,
+      0.3694322109222412
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x2de5",
+    "runtime": 0.534210205078125,
+    "all_runs": [
+      0.5349018573760986,
+      0.5369784832000732,
+      0.534210205078125
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x574",
+    "runtime": 0.48325276374816895,
+    "all_runs": [
+      0.5257463455200195,
+      0.48325276374816895,
+      0.5027165412902832
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x2a0d",
+    "runtime": 0.3637735843658447,
+    "all_runs": [
+      0.3637735843658447,
+      0.3647477626800537,
+      0.36614131927490234
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x27f0",
+    "runtime": 0.525407075881958,
+    "all_runs": [
+      0.5371284484863281,
+      0.5368809700012207,
+      0.525407075881958
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x2e79",
+    "runtime": 0.48317551612854004,
+    "all_runs": [
+      0.5060255527496338,
+      0.48418498039245605,
+      0.48317551612854004
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x247d",
+    "runtime": 0.48192310333251953,
+    "all_runs": [
+      0.48192310333251953,
+      0.48398303985595703,
+      0.48270678520202637
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x2b4e",
+    "runtime": 0.39611077308654785,
+    "all_runs": [
+      0.4088432788848877,
+      0.40840816497802734,
+      0.39611077308654785
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x1a00",
+    "runtime": 0.3909471035003662,
+    "all_runs": [
+      0.39226365089416504,
+      0.3909471035003662,
+      0.3923306465148926
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x387",
+    "runtime": 0.38054800033569336,
+    "all_runs": [
+      0.38054800033569336,
+      0.38275146484375,
+      0.40349912643432617
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x366e",
+    "runtime": 0.5346126556396484,
+    "all_runs": [
+      0.5676257610321045,
+      0.541060209274292,
+      0.5346126556396484
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x388",
+    "runtime": 0.3908219337463379,
+    "all_runs": [
+      0.39510297775268555,
+      0.3908219337463379,
+      0.3924214839935303
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x3ef6",
+    "runtime": 0.5637795925140381,
+    "all_runs": [
+      0.5637795925140381,
+      0.5654733180999756,
+      0.5682103633880615
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x2fd3",
+    "runtime": 0.4260234832763672,
+    "all_runs": [
+      0.4301948547363281,
+      0.4265255928039551,
+      0.4260234832763672
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x241e",
+    "runtime": 0.34692955017089844,
+    "all_runs": [
+      0.3593320846557617,
+      0.34692955017089844,
+      0.3603386878967285
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x124e",
+    "runtime": 0.4401395320892334,
+    "all_runs": [
+      0.4433610439300537,
+      0.4419825077056885,
+      0.4401395320892334
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x1489",
+    "runtime": 0.43726253509521484,
+    "all_runs": [
+      0.4513249397277832,
+      0.4382491111755371,
+      0.43726253509521484
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x3484",
+    "runtime": 0.43201589584350586,
+    "all_runs": [
+      0.43201589584350586,
+      0.43358922004699707,
+      0.4328029155731201
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x2696",
+    "runtime": 0.38062405586242676,
+    "all_runs": [
+      0.38062405586242676,
+      0.384629487991333,
+      0.3836221694946289
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x369a",
+    "runtime": 0.43881678581237793,
+    "all_runs": [
+      0.44235920906066895,
+      0.43881678581237793,
+      0.4541769027709961
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x22d5",
+    "runtime": 0.4322929382324219,
+    "all_runs": [
+      0.4322929382324219,
+      0.4486401081085205,
+      0.4428553581237793
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x17ce",
+    "runtime": 0.5082793235778809,
+    "all_runs": [
+      0.5530450344085693,
+      0.5082793235778809,
+      0.517148494720459
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0xfd1",
+    "runtime": 0.44983696937561035,
+    "all_runs": [
+      0.487750768661499,
+      0.44983696937561035,
+      0.45102381706237793
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x13d6",
+    "runtime": 0.4763519763946533,
+    "all_runs": [
+      0.5102353096008301,
+      0.4820821285247803,
+      0.4763519763946533
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x3516",
+    "runtime": 0.3923220634460449,
+    "all_runs": [
+      0.39585256576538086,
+      0.41107869148254395,
+      0.3923220634460449
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x10df",
+    "runtime": 0.4845559597015381,
+    "all_runs": [
+      0.4857933521270752,
+      0.48685240745544434,
+      0.4845559597015381
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x1902",
+    "runtime": 0.38626790046691895,
+    "all_runs": [
+      0.38626790046691895,
+      0.4033701419830322,
+      0.39946722984313965
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x730",
+    "runtime": 0.4272608757019043,
+    "all_runs": [
+      0.4424118995666504,
+      0.43115973472595215,
+      0.4272608757019043
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x3f81",
+    "runtime": 0.42786526679992676,
+    "all_runs": [
+      0.4312782287597656,
+      0.43241405487060547,
+      0.42786526679992676
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x293c",
+    "runtime": 0.4390599727630615,
+    "all_runs": [
+      0.43926239013671875,
+      0.4390599727630615,
+      0.4403502941131592
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x28e8",
+    "runtime": 0.5232315063476562,
+    "all_runs": [
+      0.5232315063476562,
+      0.5333542823791504,
+      0.5247998237609863
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x1c4a",
+    "runtime": 0.4395573139190674,
+    "all_runs": [
+      0.44091272354125977,
+      0.4395573139190674,
+      0.4445006847381592
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x1934",
+    "runtime": 0.47661876678466797,
+    "all_runs": [
+      0.48369288444519043,
+      0.47661876678466797,
+      0.47893285751342773
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x250a",
+    "runtime": 0.3479268550872803,
+    "all_runs": [
+      0.3479268550872803,
+      0.3490891456604004,
+      0.3619546890258789
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0xcd3",
+    "runtime": 0.43518781661987305,
+    "all_runs": [
+      0.44452452659606934,
+      0.44334983825683594,
+      0.43518781661987305
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x2511",
+    "runtime": 0.3404581546783447,
+    "all_runs": [
+      0.34249234199523926,
+      0.3409116268157959,
+      0.3404581546783447
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x2156",
+    "runtime": 0.3849632740020752,
+    "all_runs": [
+      0.3849632740020752,
+      0.3963050842285156,
+      0.3849942684173584
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x20c6",
+    "runtime": 0.4294564723968506,
+    "all_runs": [
+      0.4362185001373291,
+      0.4386482238769531,
+      0.4294564723968506
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x64b",
+    "runtime": 0.3936290740966797,
+    "all_runs": [
+      0.39943981170654297,
+      0.4046308994293213,
+      0.3936290740966797
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x232f",
+    "runtime": 0.43779444694519043,
+    "all_runs": [
+      0.43926048278808594,
+      0.43779444694519043,
+      0.44651365280151367
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x239b",
+    "runtime": 0.3935055732727051,
+    "all_runs": [
+      0.4199345111846924,
+      0.3988826274871826,
+      0.3935055732727051
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false
+    ],
+    "perm_hex": "0x3122",
+    "runtime": 0.4749579429626465,
+    "all_runs": [
+      0.47785067558288574,
+      0.47633934020996094,
+      0.4749579429626465
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x2900",
+    "runtime": 0.3380715847015381,
+    "all_runs": [
+      0.341411828994751,
+      0.3380715847015381,
+      0.34823107719421387
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x19b0",
+    "runtime": 0.5206754207611084,
+    "all_runs": [
+      0.5208196640014648,
+      0.5304877758026123,
+      0.5206754207611084
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x14d0",
+    "runtime": 0.4929361343383789,
+    "all_runs": [
+      0.49355554580688477,
+      0.5086376667022705,
+      0.4929361343383789
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0xa83",
+    "runtime": 0.38426971435546875,
+    "all_runs": [
+      0.38426971435546875,
+      0.38883399963378906,
+      0.4250497817993164
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x233b",
+    "runtime": 0.4564836025238037,
+    "all_runs": [
+      0.4602699279785156,
+      0.46094846725463867,
+      0.4564836025238037
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x2c5f",
+    "runtime": 0.4114718437194824,
+    "all_runs": [
+      0.42620182037353516,
+      0.4114718437194824,
+      0.41281890869140625
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x1c8f",
+    "runtime": 0.4601130485534668,
+    "all_runs": [
+      0.4601130485534668,
+      0.4609184265136719,
+      0.4618062973022461
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x116b",
+    "runtime": 0.5442051887512207,
+    "all_runs": [
+      0.5489969253540039,
+      0.559220552444458,
+      0.5442051887512207
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x1af6",
+    "runtime": 0.589362621307373,
+    "all_runs": [
+      0.5956406593322754,
+      0.6016147136688232,
+      0.589362621307373
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x3c49",
+    "runtime": 0.461259126663208,
+    "all_runs": [
+      0.4665095806121826,
+      0.47556114196777344,
+      0.461259126663208
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x5d6",
+    "runtime": 0.4450242519378662,
+    "all_runs": [
+      0.4450242519378662,
+      0.44541382789611816,
+      0.45072126388549805
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x3250",
+    "runtime": 0.45207858085632324,
+    "all_runs": [
+      0.45207858085632324,
+      0.45654821395874023,
+      0.46379828453063965
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x1fed",
+    "runtime": 0.5964822769165039,
+    "all_runs": [
+      0.5964822769165039,
+      0.5999023914337158,
+      0.6046204566955566
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x1838",
+    "runtime": 0.5057699680328369,
+    "all_runs": [
+      0.5057699680328369,
+      0.5087392330169678,
+      0.5070326328277588
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x568",
+    "runtime": 0.49700403213500977,
+    "all_runs": [
+      0.524467945098877,
+      0.5020384788513184,
+      0.49700403213500977
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x137",
+    "runtime": 0.44211435317993164,
+    "all_runs": [
+      0.44211435317993164,
+      0.44594502449035645,
+      0.44711899757385254
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0xd78",
+    "runtime": 0.49759483337402344,
+    "all_runs": [
+      0.4994955062866211,
+      0.5022428035736084,
+      0.49759483337402344
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x3977",
+    "runtime": 0.5368764400482178,
+    "all_runs": [
+      0.5459754467010498,
+      0.5368764400482178,
+      0.5383851528167725
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x16fe",
+    "runtime": 0.5902807712554932,
+    "all_runs": [
+      0.6096551418304443,
+      0.6016585826873779,
+      0.5902807712554932
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x30b0",
+    "runtime": 0.537724494934082,
+    "all_runs": [
+      0.5397927761077881,
+      0.537724494934082,
+      0.5397887229919434
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x1e14",
+    "runtime": 0.40489935874938965,
+    "all_runs": [
+      0.40489935874938965,
+      0.4073047637939453,
+      0.41446971893310547
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ],
+    "perm_hex": "0x3e91",
+    "runtime": 0.45160365104675293,
+    "all_runs": [
+      0.4518117904663086,
+      0.45160365104675293,
+      0.4518754482269287
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x3148",
+    "runtime": 0.45064878463745117,
+    "all_runs": [
+      0.4641742706298828,
+      0.459092378616333,
+      0.45064878463745117
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x7ee",
+    "runtime": 0.5439341068267822,
+    "all_runs": [
+      0.5506300926208496,
+      0.5452413558959961,
+      0.5439341068267822
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x2113",
+    "runtime": 0.35680699348449707,
+    "all_runs": [
+      0.3576164245605469,
+      0.35680699348449707,
+      0.3576688766479492
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x3a7b",
+    "runtime": 0.5427587032318115,
+    "all_runs": [
+      0.5502073764801025,
+      0.5679492950439453,
+      0.5427587032318115
+    ]
+  },
+  {
+    "perm": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x38d0",
+    "runtime": 0.4963719844818115,
+    "all_runs": [
+      0.4963719844818115,
+      0.5008411407470703,
+      0.49965953826904297
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ],
+    "perm_hex": "0x2c98",
+    "runtime": 0.41608762741088867,
+    "all_runs": [
+      0.42866945266723633,
+      0.41608762741088867,
+      0.42769813537597656
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ],
+    "perm_hex": "0x1f7",
+    "runtime": 0.5342726707458496,
+    "all_runs": [
+      0.5368092060089111,
+      0.5342726707458496,
+      0.5486612319946289
+    ]
+  },
+  {
+    "perm": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ],
+    "perm_hex": "0x28dc",
+    "runtime": 0.45218801498413086,
+    "all_runs": [
+      0.45401573181152344,
+      0.45341038703918457,
+      0.45218801498413086
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ],
+    "perm_hex": "0x1dd5",
+    "runtime": 0.4918990135192871,
+    "all_runs": [
+      0.4925963878631592,
+      0.4918990135192871,
+      0.49332499504089355
+    ]
+  },
+  {
+    "perm": [
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ],
+    "perm_hex": "0x1386",
+    "runtime": 0.44693970680236816,
+    "all_runs": [
+      0.4548768997192383,
+      0.45606374740600586,
+      0.44693970680236816
+    ]
+  },
+  {
+    "perm": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "perm_hex": "0x95b",
+    "runtime": 0.4183483123779297,
+    "all_runs": [
+      0.4183483123779297,
+      0.43517613410949707,
+      0.4269073009490967
+    ]
+  }
+]
