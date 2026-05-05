@@ -24,9 +24,15 @@ def perm_from_hex(value: str, width: int) -> tuple[bool, ...]:
     return tuple(bit == '1' for bit in bits)
 
 
-def write_detyped_file(benchmark: str, variant_name: str, detype_hex: str) -> Path:
+def write_detyped_file(
+    benchmark: str,
+    variant_name: str,
+    detype_hex: str,
+    output_dir: Path | None = None,
+) -> Path:
     source_path = resolve_benchmark_path(benchmark, variant=variant_name)
-    output_dir = benchmark_output_dir(source_path)
+    if output_dir is None:
+        output_dir = benchmark_output_dir(source_path)
 
     if variant_name == 'untyped':
         output_dir.mkdir(parents=True, exist_ok=True)

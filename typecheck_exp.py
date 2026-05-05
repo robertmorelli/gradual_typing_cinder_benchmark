@@ -8,7 +8,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from detyper.artifact_runner import run_typecheck_python_artifact
-from run_exp_part import load_plan, write_artifact
+from make_detyped_file import write_detyped_file
+from run_exp_part import load_plan
 from setup_experiment import PLAN_PATH
 
 TYPECHECK_PATH = Path('benchmark_results/typecheck.json')
@@ -54,7 +55,7 @@ def typecheck_plan() -> None:
                         write_typecheck(results)
                         continue
 
-                    artifact_path = write_artifact(benchmark, variant, hex_id, output_dir)
+                    artifact_path = write_detyped_file(benchmark, variant, hex_id, output_dir=output_dir)
                     try:
                         run_typecheck_python_artifact(artifact_path)
                     except Exception as exc:
