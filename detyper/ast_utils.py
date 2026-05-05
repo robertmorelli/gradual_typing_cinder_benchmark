@@ -62,28 +62,9 @@ def detypable_function_names(source: str) -> list[str]:
 
 def detypable_annotation_ids(source: str) -> list[str]:
     """Return deterministic annotation ids that participate in permutations."""
-    tree = ast.parse(source)
-    label_tree(tree)
-    ids: list[int] = []
-    for fdef in all_function_defs(tree):
-        if fdef.name.startswith('__') and fdef.name.endswith('__'):
-            continue
-        has_inline = any(
-            (isinstance(d, ast.Name) and d.id == 'inline') or
-            (isinstance(d, ast.Attribute) and d.attr == 'inline')
-            for d in fdef.decorator_list
-        )
-        if has_inline:
-            continue
-        for arg in fdef.args.args:
-            if arg.annotation is not None:
-                ids.append(arg.detyping_id)
-        if fdef.returns is not None:
-            ids.append(fdef.detyping_id)
-        for node in ast.walk(fdef):
-            if isinstance(node, ast.AnnAssign) and node.annotation is not None:
-                ids.append(node.detyping_id)
-    return [str(item) for item in sorted(set(ids))]
+    from .annotation_sites import annotation_sites_from_source
+
+    return [str(site.id) for site in annotation_sites_from_source(source)]
 
 
 class _CallUseCollector(ast.NodeVisitor):

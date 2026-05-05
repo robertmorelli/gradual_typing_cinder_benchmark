@@ -23,7 +23,10 @@ class PlanData:
     aliases: dict[str, TypeSpec]
     class_fields: dict[str, dict[str, TypeSpec]]
     class_init_params: dict[str, list[TypeSpec | None]]
+    func_classes: dict[int, str]
     selected_annotation_ids: set[int] | None = None
+    selected_field_types: dict[tuple[str, str], TypeSpec] | None = None
+    selected_constructor_param_types: dict[tuple[str, int], TypeSpec] | None = None
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
@@ -113,6 +116,16 @@ def _collect_type_aliases(module: Module) -> dict[str, TypeSpec]:
     return {name: expand_aliases(typ, aliases) or typ for name, typ in aliases.items()}
 
 
+def _collect_func_classes(module: Module) -> dict[int, str]:
+    result: dict[int, str] = {}
+    for stmt in module.body:
+        if isinstance(stmt, ast.ClassDef):
+            for item in stmt.body:
+                if isinstance(item, ast.FunctionDef):
+                    result[item.detyping_id] = stmt.name
+    return result
+
+
 def _collect_class_init_params(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, list[TypeSpec | None]]:
     result: dict[str, list[TypeSpec | None]] = {}
     classes = [stmt for stmt in module.body if isinstance(stmt, ast.ClassDef)]
@@ -141,9 +154,14 @@ def _collect_class_init_params(module: Module, aliases: dict[str, TypeSpec]) -> 
 
 def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, dict[str, TypeSpec]]:
     fields: dict[str, dict[str, TypeSpec]] = {}
+    bases: dict[str, str] = {}
     for stmt in module.body:
         if not isinstance(stmt, ast.ClassDef):
             continue
+        for base in stmt.bases:
+            if isinstance(base, ast.Name):
+                bases[stmt.name] = base.id
+                break
         cls_fields: dict[str, TypeSpec] = {}
         for node in ast.walk(stmt):
             if (
@@ -156,6 +174,17 @@ def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[
                 if typ is not None:
                     cls_fields[node.target.attr] = typ
         fields[stmt.name] = cls_fields
+    changed = True
+    while changed:
+        changed = False
+        for cls, base in bases.items():
+            if base not in fields:
+                continue
+            inherited = dict(fields[base])
+            inherited.update(fields.get(cls, {}))
+            if inherited != fields.get(cls, {}):
+                fields[cls] = inherited
+                changed = True
     return fields
 
 
@@ -183,6 +212,56 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     aliases = _collect_type_aliases(module)
     class_fields = _collect_class_fields(module, aliases)
     class_init_params = _collect_class_init_params(module, aliases)
+    func_classes = _collect_func_classes(module)
+    guide_selected_ids = {key for key, value in guide.items() if isinstance(key, int) and value}
+    if guide_selected_ids:
+        expanded_selected_ids = set(guide_selected_ids)
+        for fdef in defs:
+            if fdef.name != '__init__':
+                continue
+            selected_arg_names = {
+                arg.arg
+                for arg in fdef.args.args[1:]
+                if arg.annotation is not None and arg.detyping_id in guide_selected_ids
+            }
+            if not selected_arg_names:
+                continue
+            for node in ast.walk(fdef):
+                if (
+                    isinstance(node, ast.AnnAssign)
+                    and node.annotation is not None
+                    and isinstance(node.target, ast.Attribute)
+                    and isinstance(node.target.value, ast.Name)
+                    and node.target.value.id == 'self'
+                    and isinstance(node.value, ast.Name)
+                    and node.value.id in selected_arg_names
+                ):
+                    expanded_selected_ids.add(node.detyping_id)
+        guide_selected_ids = expanded_selected_ids
+    selected_field_types: dict[tuple[str, str], TypeSpec] | None = None
+    selected_constructor_param_types: dict[tuple[str, int], TypeSpec] | None = None
+    if guide_selected_ids:
+        selected_field_types = {}
+        selected_constructor_param_types = {}
+        for fdef in defs:
+            owner_class = func_classes.get(fdef.detyping_id)
+            if owner_class is None:
+                continue
+            if fdef.name == '__init__':
+                for idx, arg in enumerate(fdef.args.args[1:]):
+                    if arg.annotation is not None and arg.detyping_id in guide_selected_ids:
+                        typ = expand_aliases(resolve_annotation(arg.annotation), aliases)
+                        if typ is not None:
+                            selected_constructor_param_types[(owner_class, idx)] = typ
+            for node in ast.walk(fdef):
+                if (
+                    isinstance(node, ast.AnnAssign)
+                    and node.detyping_id in guide_selected_ids
+                    and isinstance(node.target, ast.Attribute)
+                ):
+                    typ = expand_aliases(resolve_annotation(node.annotation), aliases)
+                    if typ is not None:
+                        selected_field_types[(owner_class, node.target.attr)] = typ
     grouped: dict[str, list] = {}
     for fdef in defs:
         name = fdef.name
@@ -235,7 +314,7 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             for fdef in fdefs
             for d in fdef.decorator_list
         )
-        selected_annotation_ids = {key for key, value in guide.items() if isinstance(key, int) and value}
+        selected_annotation_ids = guide_selected_ids
         if selected_annotation_ids:
             is_detyped = (not has_inline) and any(_function_annotation_ids(fdef) & selected_annotation_ids for fdef in fdefs)
         else:
@@ -253,5 +332,8 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
         aliases=aliases,
         class_fields=class_fields,
         class_init_params=class_init_params,
+        func_classes=func_classes,
         selected_annotation_ids=selected_annotation_ids,
+        selected_field_types=selected_field_types,
+        selected_constructor_param_types=selected_constructor_param_types,
     )

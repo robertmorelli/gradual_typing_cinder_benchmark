@@ -29,6 +29,7 @@ EditName = Literal[
     'reproject_primitive_context_uses',
     'unwrap_box_uses',
     'box_primitive_storage_values',
+    'wrap_param_uses_with_runtime_type',
 ]
 
 
@@ -44,6 +45,30 @@ class ParamPolicy:
 @dataclass(frozen=True)
 class BodyPolicy:
     """All edits caused by a local/body annotation."""
+
+    annotation_edits: tuple[EditName, ...]
+
+
+@dataclass(frozen=True)
+class InlineParamPolicy:
+    """Expression-only edits caused by an inline parameter annotation."""
+
+    definition_edits: tuple[EditName, ...]
+    body_use_edits: tuple[EditName, ...]
+    call_edits: tuple[EditName, ...]
+
+
+@dataclass(frozen=True)
+class ConstructorParamPolicy:
+    """All edits caused by a constructor parameter annotation."""
+
+    definition_edits: tuple[EditName, ...]
+    call_edits: tuple[EditName, ...]
+
+
+@dataclass(frozen=True)
+class GlobalPolicy:
+    """All edits caused by a module-level annotation."""
 
     annotation_edits: tuple[EditName, ...]
 
@@ -200,6 +225,44 @@ PARAM_POLICIES: dict[TypeKind, ParamPolicy] = {
 }
 
 
+INLINE_PARAM_POLICIES: dict[TypeKind, InlineParamPolicy] = {
+    'none': InlineParamPolicy(('remove_annotation',), (), ()),
+    'builtin': InlineParamPolicy(('remove_annotation',), (), ()),
+    'primitive': InlineParamPolicy(('remove_annotation',), ('wrap_param_uses_with_runtime_type',), ('wrap_with_runtime_type',)),
+    'checked_list': InlineParamPolicy(('remove_annotation',), ('wrap_param_uses_with_runtime_type',), ('wrap_with_runtime_type',)),
+    'container': InlineParamPolicy(('remove_annotation',), ('wrap_param_uses_with_runtime_type',), ('wrap_with_runtime_type',)),
+    'cast': InlineParamPolicy(('remove_annotation',), ('wrap_param_uses_with_runtime_type',), ('wrap_with_runtime_type',)),
+}
+
+
+CONSTRUCTOR_PARAM_POLICIES: dict[TypeKind, ConstructorParamPolicy] = {
+    'none': ConstructorParamPolicy(
+        definition_edits=('remove_annotation',),
+        call_edits=(),
+    ),
+    'builtin': ConstructorParamPolicy(
+        definition_edits=('remove_annotation',),
+        call_edits=(),
+    ),
+    'primitive': ConstructorParamPolicy(
+        definition_edits=('rewrite_param_binding', 'box'),
+        call_edits=('wrap_with_runtime_type', 'box'),
+    ),
+    'checked_list': ConstructorParamPolicy(
+        definition_edits=('remove_annotation',),
+        call_edits=(),
+    ),
+    'container': ConstructorParamPolicy(
+        definition_edits=('rewrite_param_binding',),
+        call_edits=('wrap_with_runtime_type',),
+    ),
+    'cast': ConstructorParamPolicy(
+        definition_edits=('rewrite_param_binding',),
+        call_edits=('wrap_with_runtime_type',),
+    ),
+}
+
+
 BODY_POLICIES: dict[TypeKind, BodyPolicy] = {
     'none': BodyPolicy(annotation_edits=('remove_annotation',)),
     'builtin': BodyPolicy(annotation_edits=('remove_annotation',)),
@@ -213,6 +276,16 @@ BODY_POLICIES: dict[TypeKind, BodyPolicy] = {
     'cast': BodyPolicy(
         annotation_edits=('wrap_later_name_uses', 'remove_annotation', 'wrap_assigned_expression'),
     ),
+}
+
+
+GLOBAL_POLICIES: dict[TypeKind, GlobalPolicy] = {
+    'none': GlobalPolicy(annotation_edits=('remove_annotation',)),
+    'builtin': GlobalPolicy(annotation_edits=('remove_annotation',)),
+    'primitive': GlobalPolicy(annotation_edits=('remove_annotation', 'box_primitive_storage_values')),
+    'checked_list': GlobalPolicy(annotation_edits=('remove_annotation',)),
+    'container': GlobalPolicy(annotation_edits=('remove_annotation',)),
+    'cast': GlobalPolicy(annotation_edits=('remove_annotation',)),
 }
 
 
@@ -270,6 +343,21 @@ def param_call_edits_for(
 def body_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> BodyPolicy:
     """Return the full policy caused by a body annotation."""
     return BODY_POLICIES[classify_type(typ, aliases)]
+
+
+def inline_param_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> InlineParamPolicy:
+    """Return expression-only policy caused by an inline parameter annotation."""
+    return INLINE_PARAM_POLICIES[classify_type(typ, aliases)]
+
+
+def constructor_param_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ConstructorParamPolicy:
+    """Return the full policy caused by a constructor parameter annotation."""
+    return CONSTRUCTOR_PARAM_POLICIES[classify_type(typ, aliases)]
+
+
+def global_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> GlobalPolicy:
+    """Return policy caused by a module-level annotation."""
+    return GLOBAL_POLICIES[classify_type(typ, aliases)]
 
 
 def return_policy_for(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = None) -> ReturnPolicy:
