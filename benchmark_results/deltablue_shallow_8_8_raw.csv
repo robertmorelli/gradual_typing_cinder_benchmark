@@ -1,0 +1,769 @@
+proportion,proportion_index,proportion_hex_id,batch_number,batch_index,run_length,stdout,stderr
+0.8285714285714286,1,0x7f7bfff93,1,1,2.447150468826294,"2.447150468826294
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,2,2.323808431625366,"2.323808431625366
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,3,2.4403891563415527,"2.4403891563415527
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,4,2.2947840690612793,"2.2947840690612793
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,5,2.5976619720458984,"2.5976619720458984
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,6,2.63114070892334,"2.63114070892334
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,7,2.4207918643951416,"2.4207918643951416
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,1,0x7f7bfff93,1,8,2.4967610836029053,"2.4967610836029053
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,1,2.1800973415374756,"2.1800973415374756
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,2,2.301596164703369,"2.301596164703369
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,3,2.206097364425659,"2.206097364425659
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,4,2.147979736328125,"2.147979736328125
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,5,2.290693998336792,"2.290693998336792
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,6,2.1737282276153564,"2.1737282276153564
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,7,2.020897626876831,"2.020897626876831
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,2,0x75ff6e7ff,1,8,2.1829278469085693,"2.1829278469085693
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,1,2.1444783210754395,"2.1444783210754395
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,2,2.3540890216827393,"2.3540890216827393
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,3,2.2079203128814697,"2.2079203128814697
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,4,2.1695468425750732,"2.1695468425750732
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,5,2.1483614444732666,"2.1483614444732666
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,6,2.2912139892578125,"2.2912139892578125
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,7,2.316711902618408,"2.316711902618408
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,3,0x7fffdeddc,1,8,2.1573243141174316,"2.1573243141174316
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,1,2.4946978092193604,"2.4946978092193604
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,2,2.383528470993042,"2.383528470993042
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,3,2.4360833168029785,"2.4360833168029785
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,4,2.510763645172119,"2.510763645172119
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,5,2.531633138656616,"2.531633138656616
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,6,2.540959596633911,"2.540959596633911
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,7,2.48454213142395,"2.48454213142395
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,4,0x55fffcfdf,1,8,2.3382511138916016,"2.3382511138916016
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,1,1.8770272731781006,"1.8770272731781006
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,2,1.8411364555358887,"1.8411364555358887
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,3,2.0189714431762695,"2.0189714431762695
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,4,2.0659308433532715,"2.0659308433532715
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,5,1.9012806415557861,"1.9012806415557861
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,6,1.9874227046966553,"1.9874227046966553
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,7,1.866729736328125,"1.866729736328125
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,5,0x5eefbf7ef,1,8,1.982750654220581,"1.982750654220581
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,1,2.3776068687438965,"2.3776068687438965
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,2,2.3496947288513184,"2.3496947288513184
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,3,2.503079891204834,"2.503079891204834
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,4,2.582878828048706,"2.582878828048706
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,5,2.486848831176758,"2.486848831176758
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,6,2.5140979290008545,"2.5140979290008545
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,7,2.3792335987091064,"2.3792335987091064
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,6,0x7fdfeedd7,1,8,2.4806771278381348,"2.4806771278381348
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,1,2.6104962825775146,"2.6104962825775146
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,2,2.623138666152954,"2.623138666152954
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,3,2.731266975402832,"2.731266975402832
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,4,2.5550243854522705,"2.5550243854522705
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,5,2.61173415184021,"2.61173415184021
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,6,2.5415685176849365,"2.5415685176849365
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,7,2.6695327758789062,"2.6695327758789062
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,7,0x7bedefddf,1,8,2.557537317276001,"2.557537317276001
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,1,2.4808149337768555,"2.4808149337768555
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,2,2.5346736907958984,"2.5346736907958984
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,3,2.3140904903411865,"2.3140904903411865
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,4,2.694218635559082,"2.694218635559082
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,5,2.354160785675049,"2.354160785675049
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,6,2.4543864727020264,"2.4543864727020264
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,7,2.585649251937866,"2.585649251937866
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,8,0x7ffbe3fb7,1,8,2.479513168334961,"2.479513168334961
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,1,2.226511001586914,"2.226511001586914
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,2,1.9715080261230469,"1.9715080261230469
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,3,2.18098783493042,"2.18098783493042
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,4,2.0211892127990723,"2.0211892127990723
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,5,2.3164734840393066,"2.3164734840393066
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,6,2.158431053161621,"2.158431053161621
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,7,2.112201690673828,"2.112201690673828
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,9,0x7fefef74f,1,8,1.9802401065826416,"1.9802401065826416
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,1,2.1156702041625977,"2.1156702041625977
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,2,2.070380210876465,"2.070380210876465
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,3,2.0046045780181885,"2.0046045780181885
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,4,2.1763830184936523,"2.1763830184936523
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,5,2.114701986312866,"2.114701986312866
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,6,2.1951324939727783,"2.1951324939727783
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,7,2.0032849311828613,"2.0032849311828613
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,10,0x7ff9b73ff,1,8,2.110386848449707,"2.110386848449707
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,1,2.52425479888916,"2.52425479888916
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,2,2.6180260181427,"2.6180260181427
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,3,2.5485355854034424,"2.5485355854034424
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,4,2.871067762374878,"2.871067762374878
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,5,2.5977792739868164,"2.5977792739868164
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,6,2.5684804916381836,"2.5684804916381836
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,7,2.5535972118377686,"2.5535972118377686
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,11,0x79f7deeff,1,8,2.4917309284210205,"2.4917309284210205
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,1,2.4206347465515137,"2.4206347465515137
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,2,2.4565322399139404,"2.4565322399139404
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,3,2.688283920288086,"2.688283920288086
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,4,2.5228755474090576,"2.5228755474090576
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,5,2.7236006259918213,"2.7236006259918213
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,6,2.545153856277466,"2.545153856277466
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,7,2.743689775466919,"2.743689775466919
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,12,0x7cdb7bfff,1,8,2.469087839126587,"2.469087839126587
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,1,2.389202356338501,"2.389202356338501
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,2,2.4091908931732178,"2.4091908931732178
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,3,2.371506690979004,"2.371506690979004
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,4,2.354907512664795,"2.354907512664795
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,5,2.3773679733276367,"2.3773679733276367
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,6,2.4320645332336426,"2.4320645332336426
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,7,2.3570024967193604,"2.3570024967193604
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,13,0x37f7e7ffd,1,8,2.3151047229766846,"2.3151047229766846
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,1,2.0603699684143066,"2.0603699684143066
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,2,2.074117660522461,"2.074117660522461
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,3,2.4496352672576904,"2.4496352672576904
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,4,2.2593889236450195,"2.2593889236450195
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,5,2.05739688873291,"2.05739688873291
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,6,2.2588794231414795,"2.2588794231414795
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,7,2.185866117477417,"2.185866117477417
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,14,0x76febbfdf,1,8,2.1018686294555664,"2.1018686294555664
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,1,2.061250686645508,"2.061250686645508
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,2,2.026041030883789,"2.026041030883789
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,3,2.0607781410217285,"2.0607781410217285
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,4,2.06083345413208,"2.06083345413208
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,5,2.0278329849243164,"2.0278329849243164
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,6,2.041548490524292,"2.041548490524292
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,7,2.0135350227355957,"2.0135350227355957
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,15,0x7fbf9f7bd,1,8,1.8968093395233154,"1.8968093395233154
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,1,2.4671311378479004,"2.4671311378479004
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,2,2.391505718231201,"2.391505718231201
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,3,2.4317309856414795,"2.4317309856414795
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,4,2.331772565841675,"2.331772565841675
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,5,2.6153652667999268,"2.6153652667999268
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,6,2.5581507682800293,"2.5581507682800293
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,7,2.4976000785827637,"2.4976000785827637
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,16,0x5db7f7fdf,1,8,2.450374126434326,"2.450374126434326
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,1,1.9860811233520508,"1.9860811233520508
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,2,1.9896306991577148,"1.9896306991577148
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,3,2.2062244415283203,"2.2062244415283203
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,4,2.0691609382629395,"2.0691609382629395
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,5,2.1525094509124756,"2.1525094509124756
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,6,2.1028261184692383,"2.1028261184692383
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,7,2.1200509071350098,"2.1200509071350098
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,17,0x3df7fe6ff,1,8,2.244022846221924,"2.244022846221924
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,1,2.5839483737945557,"2.5839483737945557
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,2,2.5648512840270996,"2.5648512840270996
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,3,2.5493357181549072,"2.5493357181549072
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,4,2.6849329471588135,"2.6849329471588135
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,5,2.4239907264709473,"2.4239907264709473
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,6,2.5815629959106445,"2.5815629959106445
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,7,2.5580575466156006,"2.5580575466156006
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,18,0x7fedef9fb,1,8,2.4145028591156006,"2.4145028591156006
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,1,2.3783369064331055,"2.3783369064331055
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,2,2.462956666946411,"2.462956666946411
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,3,2.395810604095459,"2.395810604095459
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,4,2.2156982421875,"2.2156982421875
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,5,2.262894868850708,"2.262894868850708
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,6,2.2039060592651367,"2.2039060592651367
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,7,2.2447516918182373,"2.2447516918182373
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,19,0x6fd7bdffd,1,8,2.33272647857666,"2.33272647857666
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,1,2.4737613201141357,"2.4737613201141357
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,2,2.537734270095825,"2.537734270095825
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,3,2.5433101654052734,"2.5433101654052734
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,4,2.6863667964935303,"2.6863667964935303
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,5,2.6938939094543457,"2.6938939094543457
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,6,2.4402475357055664,"2.4402475357055664
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,7,2.3492801189422607,"2.3492801189422607
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,20,0x79fbf7fcf,1,8,2.5058364868164062,"2.5058364868164062
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,1,2.5885872840881348,"2.5885872840881348
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,2,2.570568561553955,"2.570568561553955
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,3,2.5295989513397217,"2.5295989513397217
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,4,2.4990739822387695,"2.4990739822387695
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,5,2.667140007019043,"2.667140007019043
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,6,2.586869716644287,"2.586869716644287
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,7,2.4578120708465576,"2.4578120708465576
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,21,0x67ffc7fbf,1,8,2.646540403366089,"2.646540403366089
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,1,2.5168087482452393,"2.5168087482452393
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,2,2.3966925144195557,"2.3966925144195557
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,3,2.588263511657715,"2.588263511657715
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,4,2.5010173320770264,"2.5010173320770264
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,5,2.559995651245117,"2.559995651245117
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,6,2.374162197113037,"2.374162197113037
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,7,2.484736680984497,"2.484736680984497
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,22,0x7e7deffeb,1,8,2.8324291706085205,"2.8324291706085205
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,1,2.4417378902435303,"2.4417378902435303
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,2,2.501973867416382,"2.501973867416382
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,3,2.498741388320923,"2.498741388320923
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,4,2.48716402053833,"2.48716402053833
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,5,2.4044671058654785,"2.4044671058654785
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,6,2.348118543624878,"2.348118543624878
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,7,2.4119081497192383,"2.4119081497192383
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,23,0x7bffefafa,1,8,2.383781671524048,"2.383781671524048
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,1,2.4463047981262207,"2.4463047981262207
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,2,2.2746288776397705,"2.2746288776397705
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,3,2.293095350265503,"2.293095350265503
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,4,2.4218249320983887,"2.4218249320983887
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,5,2.298434019088745,"2.298434019088745
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,6,2.37954044342041,"2.37954044342041
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,7,2.5737950801849365,"2.5737950801849365
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,24,0x7fb7b7fe7,1,8,2.4366326332092285,"2.4366326332092285
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,1,2.4060206413269043,"2.4060206413269043
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,2,2.4168505668640137,"2.4168505668640137
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,3,2.4397265911102295,"2.4397265911102295
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,4,2.428525924682617,"2.428525924682617
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,5,2.465639591217041,"2.465639591217041
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,6,2.4802772998809814,"2.4802772998809814
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,7,2.300332546234131,"2.300332546234131
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,25,0x7fffb6b7d,1,8,2.385798454284668,"2.385798454284668
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,1,2.5308423042297363,"2.5308423042297363
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,2,2.3416805267333984,"2.3416805267333984
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,3,2.263453722000122,"2.263453722000122
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,4,2.3707540035247803,"2.3707540035247803
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,5,2.4236807823181152,"2.4236807823181152
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,6,2.2999608516693115,"2.2999608516693115
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,7,2.4189605712890625,"2.4189605712890625
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,26,0x7beffff4e,1,8,2.2554807662963867,"2.2554807662963867
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,1,2.4355971813201904,"2.4355971813201904
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,2,2.4842002391815186,"2.4842002391815186
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,3,2.547219753265381,"2.547219753265381
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,4,2.3904080390930176,"2.3904080390930176
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,5,2.4886562824249268,"2.4886562824249268
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,6,2.776801347732544,"2.776801347732544
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,7,2.3485896587371826,"2.3485896587371826
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,27,0x5defbfaff,1,8,2.3323678970336914,"2.3323678970336914
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,1,2.074596643447876,"2.074596643447876
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,2,1.9911985397338867,"1.9911985397338867
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,3,2.071667432785034,"2.071667432785034
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,4,2.167717695236206,"2.167717695236206
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,5,2.056546926498413,"2.056546926498413
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,6,2.1235833168029785,"2.1235833168029785
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,7,1.966026782989502,"1.966026782989502
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,28,0x5feefdfaf,1,8,2.151890516281128,"2.151890516281128
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,1,2.171278715133667,"2.171278715133667
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,2,2.2640275955200195,"2.2640275955200195
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,3,2.151381731033325,"2.151381731033325
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,4,2.3536906242370605,"2.3536906242370605
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,5,2.2490127086639404,"2.2490127086639404
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,6,2.3188860416412354,"2.3188860416412354
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,7,2.356797456741333,"2.356797456741333
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,29,0x7feffefc5,1,8,2.279921293258667,"2.279921293258667
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,1,2.154189109802246,"2.154189109802246
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,2,2.161651849746704,"2.161651849746704
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,3,2.188687324523926,"2.188687324523926
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,4,2.0977485179901123,"2.0977485179901123
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,5,2.1653003692626953,"2.1653003692626953
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,6,2.0503125190734863,"2.0503125190734863
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,7,2.1553430557250977,"2.1553430557250977
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,30,0x7fd6efedf,1,8,2.172367572784424,"2.172367572784424
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,1,2.0723366737365723,"2.0723366737365723
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,2,2.1493687629699707,"2.1493687629699707
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,3,2.1477789878845215,"2.1477789878845215
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,4,2.193068504333496,"2.193068504333496
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,5,1.9843239784240723,"1.9843239784240723
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,6,2.158231258392334,"2.158231258392334
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,7,2.1791417598724365,"2.1791417598724365
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,31,0x3ffacffef,1,8,2.000211000442505,"2.000211000442505
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,1,2.6690824031829834,"2.6690824031829834
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,2,2.405472755432129,"2.405472755432129
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,3,2.379678249359131,"2.379678249359131
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,4,2.4900100231170654,"2.4900100231170654
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,5,2.4810004234313965,"2.4810004234313965
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,6,2.614103078842163,"2.614103078842163
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,7,2.474323272705078,"2.474323272705078
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
+0.8285714285714286,32,0x2ff93ffff,1,8,2.5826103687286377,"2.5826103687286377
+","JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt
+"
