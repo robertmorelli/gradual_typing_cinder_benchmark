@@ -81,6 +81,30 @@ def local_class_types(func: FunctionDef, plan: PlanData) -> dict[str, str]:
             name = annotation_name(stmt.annotation)
             if name is not None:
                 local_types[stmt.target.id] = name
+        elif isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name):
+            iter_type = None
+            if isinstance(stmt.iter, ast.Name) and stmt.iter.id in local_types:
+                iter_cls = local_types[stmt.iter.id]
+                pass
+            iter_typ = None
+            if isinstance(stmt.iter, ast.Name):
+                for ann in ast.walk(func):
+                    if (
+                        isinstance(ann, ast.AnnAssign)
+                        and isinstance(ann.target, ast.Name)
+                        and ann.target.id == stmt.iter.id
+                        and ann.annotation is not None
+                    ):
+                        iter_typ = ann.annotation
+                        break
+                if iter_typ is None and info is not None:
+                    for idx, arg in enumerate(func.args.args):
+                        if arg.arg == stmt.iter.id and idx < len(info.param_types):
+                            iter_typ = info.param_types[idx]
+                            break
+            if iter_typ is not None:
+                if isinstance(iter_typ, ast.Subscript) and isinstance(iter_typ.slice, ast.Name):
+                    local_types[stmt.target.id] = iter_typ.slice.id
     return local_types
 
 
@@ -102,12 +126,30 @@ def attr_owner_class(expr: ast.expr, *, owner_class: str | None, local_types: di
     return None
 
 
+def _ancestors(cls: str, plan: PlanData) -> set[str]:
+    bases = plan.class_bases or {}
+    result: set[str] = set()
+    current = cls
+    while current in bases:
+        current = bases[current]
+        if current in result:
+            break
+        result.add(current)
+    return result
+
+
 def field_ref_fact(expr: ast.Attribute, *, owner_class: str | None, local_types: dict[str, str], plan: PlanData) -> FieldRefFact | None:
     cls = attr_owner_class(expr.value, owner_class=owner_class, local_types=local_types, plan=plan)
     if cls is None:
         return None
     declared = plan.class_fields.get(cls, {}).get(expr.attr)
     selected = (plan.selected_field_types or {}).get((cls, expr.attr))
+    if selected is None and plan.selected_field_types:
+        ancestors = _ancestors(cls, plan)
+        for (other_cls, attr), typ in plan.selected_field_types.items():
+            if attr == expr.attr and other_cls in ancestors:
+                selected = typ
+                break
     if declared is None and selected is None:
         return None
     return FieldRefFact(cls, expr.attr, declared, selected)

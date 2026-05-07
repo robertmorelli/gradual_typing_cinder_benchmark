@@ -206,6 +206,8 @@ def generate_tasks_params_calls(
                 )
                 arg_expr = call.args[arg_index]
                 caller_is_boxed = isinstance(arg_expr, ast.Name) and arg_expr.id in caller_primitive_params
+                if isinstance(arg_expr, ast.Constant):
+                    continue
                 if callee_selected and not caller_is_boxed:
                     result.append(Detyper(make_wrap_intent(arg_expr, caller, [Arg(None, None, wrap_order=0)], caller.name)))
                 elif (not callee_selected) and caller_is_boxed:
@@ -360,6 +362,9 @@ def generate_tasks_body(
         typ = selected_field_type(expr)
         if classify_type(typ, plan.aliases) == 'primitive':
             return typ
+        owner_cls = attr_owner_class(expr.value)
+        if owner_cls is not None and expr.attr in plan.class_fields.get(owner_cls, {}):
+            return None
         matches = [typ for (_cls, field), typ in (plan.selected_field_types or {}).items() if field == expr.attr]
         all_declared = [fields[expr.attr] for fields in plan.class_fields.values() if expr.attr in fields]
         if matches and len({ast.dump(item) for item in matches + all_declared}) == 1 and classify_type(matches[0], plan.aliases) == 'primitive':
@@ -599,7 +604,7 @@ def generate_tasks_body(
         if callee_name is None:
             return False
         callee = plan.funcs.get(callee_name)
-        if callee is None or not callee.is_detyped or callee.return_type is None:
+        if callee is None or callee.return_type is None:
             return False
         if classify_type(callee.return_type, plan.aliases) != 'primitive':
             return False
@@ -611,6 +616,15 @@ def generate_tasks_body(
     for fields in plan.class_fields.values():
         for field, typ in fields.items():
             field_types_by_name.setdefault(field, []).append(typ)
+    dynamic_via_field_locals: set[str] = set()
+    selected_field_attrs = {attr for (_cls, attr) in (plan.selected_field_types or {})}
+    for assign in ast.walk(node):
+        if isinstance(assign, ast.Assign) and len(assign.targets) == 1 and isinstance(assign.targets[0], ast.Name) and isinstance(assign.value, ast.Attribute):
+            fact = field_ref_fact(assign.value, owner_class=owner_class, local_types=local_types, plan=plan)
+            if fact is not None and fact.storage_detyped:
+                dynamic_via_field_locals.add(assign.targets[0].id)
+            elif assign.value.attr in selected_field_attrs:
+                dynamic_via_field_locals.add(assign.targets[0].id)
     for boolop in ast.walk(node):
         if isinstance(boolop, ast.BoolOp):
             has_cbool = any(
@@ -628,7 +642,12 @@ def generate_tasks_body(
                             or (isinstance(op, ast.Call) and isinstance(op.func, ast.Name) and classify_type(ast.Name(id=op.func.id, ctx=ast.Load()), plan.aliases) == 'primitive')
                             for op in operands
                         )
-                        if has_primitive_operand:
+                        has_dynamic_operand = any(
+                            (isinstance(op, ast.Name) and op.id in dynamic_via_field_locals)
+                            or (isinstance(op, ast.Attribute) and (fact := field_ref_fact(op, owner_class=owner_class, local_types=local_types, plan=plan)) is not None and fact.storage_detyped)
+                            for op in operands
+                        )
+                        if has_primitive_operand or has_dynamic_operand:
                             result.append(Detyper(make_wrap_intent(value, node, [Arg(None, ast.Name(id='cbool', ctx=ast.Load()), wrap_order=0)], node.name)))
 
     primitive_field_types = {
@@ -724,7 +743,11 @@ def generate_tasks_body(
                             owner_typ = ast.Name(id=owner_cls, ctx=ast.Load())
                     if owner_typ is not None:
                         result.append(Detyper(make_wrap_intent(target.value, node, [Arg(None, owner_typ, wrap_order=0)], node.name)))
-                field_typ = primitive_attr_type(target)
+                target_owner_cls = attr_owner_class(target.value) if isinstance(target, ast.Attribute) else None
+                if isinstance(target, ast.Attribute) and target_owner_cls is None:
+                    field_typ = None
+                else:
+                    field_typ = primitive_attr_type(target)
             if field_typ is None and isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
                 field_typ = local_subscript_value_types.get(target.value.id)
             if classify_type(field_typ, plan.aliases) == 'primitive':
@@ -773,7 +796,18 @@ def generate_tasks_body(
             if ann.value is not None and isinstance(ann.value, ast.Constant) and isinstance(ann.value.value, (int, float, bool)):
                 result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, typ, wrap_order=0), Arg(None, None, wrap_order=1)], node.name)))
             elif ann.value is not None and primitive_expr_type(ann.value) is not None and not (isinstance(ann.value, ast.Name) and ann.value.id in primitive_context_locals):
-                result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, None, wrap_order=0)], node.name)))
+                if isinstance(ann.value, ast.Attribute):
+                    result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, typ, wrap_order=0), Arg(None, None, wrap_order=1)], node.name)))
+                else:
+                    result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, None, wrap_order=0)], node.name)))
+            elif (
+                ann.value is not None
+                and isinstance(ann.value, ast.Attribute)
+                and not (isinstance(ann.value, ast.Name) and ann.value.id in primitive_context_locals)
+            ):
+                fact = field_ref_fact(ann.value, owner_class=owner_class, local_types=local_types, plan=plan)
+                if fact is not None and fact.storage_detyped and fact.declared_type is not None and classify_type(fact.declared_type, plan.aliases) == 'primitive':
+                    result.append(Detyper(make_wrap_intent(ann, node, [Arg(None, typ, wrap_order=0), Arg(None, None, wrap_order=1)], node.name)))
             for assign in ast.walk(node):
                 if not isinstance(assign, ast.Assign):
                     continue
@@ -786,6 +820,8 @@ def generate_tasks_body(
                     if value_typ is not None:
                         if isinstance(assign.value, ast.BinOp):
                             result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, value_typ, wrap_order=0)], node.name)))
+                        elif isinstance(assign.value, ast.Attribute):
+                            result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, typ, wrap_order=0), Arg(None, None, wrap_order=1)], node.name)))
                         elif not (isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name) and assign.value.func.id == 'box') and not (isinstance(assign.value, ast.Name) and assign.value.id in primitive_context_locals):
                             result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
         if 'wrap_assigned_expression' in actions and not is_self_field:
@@ -803,6 +839,17 @@ def generate_tasks_body(
                 if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load) and sub.id in primitive_context_locals:
                     result.append(Detyper(make_wrap_intent(sub, node, [Arg(None, primitive_context_locals[sub.id], wrap_order=0)], node.name)))
 
+    kept_primitive_ann_names: set[str] = set()
+    for ann in find_ann_assigns(node):
+        if isinstance(ann.target, ast.Name) and not _annotation_selected(plan, ann):
+            ann_typ = expand_aliases(ann.annotation, plan.aliases)
+            if classify_type(ann_typ, plan.aliases) == 'primitive':
+                kept_primitive_ann_names.add(ann.target.id)
+    for arg in node.args.args:
+        if arg.annotation is not None and not _annotation_selected(plan, arg):
+            arg_typ = expand_aliases(arg.annotation, plan.aliases)
+            if classify_type(arg_typ, plan.aliases) == 'primitive':
+                kept_primitive_ann_names.add(arg.arg)
     for assign in ast.walk(node):
         if not isinstance(assign, ast.Assign):
             continue
@@ -811,6 +858,12 @@ def generate_tasks_body(
                 value_typ = primitive_expr_type(assign.value)
                 if value_typ is not None and not (isinstance(assign.value, ast.Call) and isinstance(assign.value.func, ast.Name) and assign.value.func.id == 'box') and not (isinstance(assign.value, ast.Name) and assign.value.id in primitive_context_locals):
                     result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
+                elif isinstance(assign.value, ast.Name) and assign.value.id in kept_primitive_ann_names:
+                    result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
+                elif isinstance(assign.value, ast.Subscript) and isinstance(assign.value.value, ast.Name) and assign.value.value.id in local_subscript_value_types:
+                    elem_typ = local_subscript_value_types[assign.value.value.id]
+                    if classify_type(elem_typ, plan.aliases) == 'primitive':
+                        result.append(Detyper(make_wrap_intent(assign, node, [Arg(None, None, wrap_order=1)], node.name)))
                 elif (
                     isinstance(assign.value, ast.Constant)
                     and isinstance(assign.value.value, (int, float, bool))

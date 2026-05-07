@@ -80,13 +80,16 @@ _PRIMITIVE_NUMERIC_NAMES = frozenset({
 
 
 class _RedundantBoxUnwrapper(ast.NodeTransformer):
-    def __init__(self, boxed_names: set[str]):
+    def __init__(self, boxed_names: set[str], skip_node_ids: set[int] | None = None):
         self.boxed_names = boxed_names
+        self.skip_node_ids = skip_node_ids or set()
 
     def _is_boxed_name(self, expr: ast.expr) -> bool:
         return isinstance(expr, ast.Name) and expr.id in self.boxed_names
 
     def visit_Call(self, node: ast.Call):
+        if id(node) in self.skip_node_ids:
+            return node
         if isinstance(node.func, ast.Name) and len(node.args) == 1:
             func_name = node.func.id
             inner = node.args[0]
@@ -118,6 +121,9 @@ class _RedundantBoxUnwrapper(ast.NodeTransformer):
 
 def _unwrap_redundant_box(module: Module) -> None:
     """Remove box(name) when name is a local already assigned via box(...)."""
+    class_primitive_fields = _collect_primitive_attr_fields_per_class(module)
+    func_owner_class = _func_owner_classes(module)
+    func_local_classes = _func_local_class_types(module, func_owner_class)
     for fdef in ast.walk(module):
         if not isinstance(fdef, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -130,8 +136,172 @@ def _unwrap_redundant_box(module: Module) -> None:
             for target in assign.targets:
                 if isinstance(target, ast.Name):
                     boxed.add(target.id)
+        owner_cls = func_owner_class.get(id(fdef))
+        local_types = func_local_classes.get(id(fdef), {})
+
+        def _target_attr_is_primitive_kept(target: ast.expr) -> bool:
+            if not isinstance(target, ast.Attribute):
+                return False
+            cls = _resolve_target_owner(target.value, owner_cls, local_types)
+            if cls is None:
+                return False
+            return target.attr in class_primitive_fields.get(cls, set())
+
+        skip_value_ids: set[int] = set()
+        for assign in ast.walk(fdef):
+            if not isinstance(assign, ast.Assign):
+                continue
+            for target in assign.targets:
+                if _target_attr_is_primitive_kept(target):
+                    skip_value_ids.add(id(assign.value))
+                    break
         if boxed:
-            _RedundantBoxUnwrapper(boxed).visit(fdef)
+            _RedundantBoxUnwrapper(boxed, skip_value_ids).visit(fdef)
+        for assign in ast.walk(fdef):
+            if not isinstance(assign, ast.Assign):
+                continue
+            if not any(_target_attr_is_primitive_kept(t) for t in assign.targets):
+                continue
+            v = assign.value
+            if (
+                isinstance(v, ast.Call)
+                and isinstance(v.func, ast.Name)
+                and v.func.id == 'box'
+                and len(v.args) == 1
+                and isinstance(v.args[0], ast.Call)
+                and isinstance(v.args[0].func, ast.Name)
+                and v.args[0].func.id in _PRIMITIVE_NUMERIC_NAMES
+            ):
+                assign.value = v.args[0]
+        _wrap_kept_primitive_assigns(fdef, boxed)
+
+
+def _collect_primitive_attr_fields_per_class(module: Module) -> dict[str, set[str]]:
+    result: dict[str, set[str]] = {}
+    for cls in module.body:
+        if not isinstance(cls, ast.ClassDef):
+            continue
+        fields: set[str] = set()
+        for stmt in ast.walk(cls):
+            if (
+                isinstance(stmt, ast.AnnAssign)
+                and isinstance(stmt.target, ast.Attribute)
+                and isinstance(stmt.target.value, ast.Name)
+                and stmt.target.value.id == 'self'
+                and isinstance(stmt.annotation, ast.Name)
+                and stmt.annotation.id in _PRIMITIVE_NUMERIC_NAMES
+            ):
+                fields.add(stmt.target.attr)
+        result[cls.name] = fields
+    bases: dict[str, str] = {}
+    for cls in module.body:
+        if isinstance(cls, ast.ClassDef):
+            for base in cls.bases:
+                if isinstance(base, ast.Name):
+                    bases[cls.name] = base.id
+                    break
+    changed = True
+    while changed:
+        changed = False
+        for cls, base in bases.items():
+            if base in result:
+                merged = result[base] | result.get(cls, set())
+                if merged != result.get(cls, set()):
+                    result[cls] = merged
+                    changed = True
+    return result
+
+
+def _func_owner_classes(module: Module) -> dict[int, str]:
+    result: dict[int, str] = {}
+    for cls in module.body:
+        if isinstance(cls, ast.ClassDef):
+            for item in cls.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    result[id(item)] = cls.name
+    return result
+
+
+def _func_local_class_types(module: Module, owner_classes: dict[int, str]) -> dict[int, dict[str, str]]:
+    result: dict[int, dict[str, str]] = {}
+    for fdef in ast.walk(module):
+        if not isinstance(fdef, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        local_types: dict[str, str] = {}
+        for arg in fdef.args.args:
+            if isinstance(arg.annotation, ast.Name):
+                local_types[arg.arg] = arg.annotation.id
+        for stmt in ast.walk(fdef):
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and isinstance(stmt.annotation, ast.Name):
+                local_types[stmt.target.id] = stmt.annotation.id
+            elif isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == 'cast' and stmt.value.args:
+                cast_typ = stmt.value.args[0]
+                cls_name = None
+                if isinstance(cast_typ, ast.Name):
+                    cls_name = cast_typ.id
+                elif isinstance(cast_typ, ast.Subscript) and isinstance(cast_typ.value, ast.Name) and cast_typ.value.id == 'Optional' and isinstance(cast_typ.slice, ast.Name):
+                    cls_name = cast_typ.slice.id
+                if cls_name is not None:
+                    local_types[stmt.targets[0].id] = cls_name
+        result[id(fdef)] = local_types
+    return result
+
+
+def _resolve_target_owner(expr: ast.expr, owner_cls: str | None, local_types: dict[str, str]) -> str | None:
+    if isinstance(expr, ast.Name):
+        if expr.id == 'self':
+            return owner_cls
+        return local_types.get(expr.id)
+    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) and expr.func.id == 'cast' and expr.args and isinstance(expr.args[0], ast.Name):
+        return expr.args[0].id
+    return None
+
+
+def _collect_primitive_attr_fields(module: Module) -> set[str]:
+    """Field names that still have a primitive annotation somewhere in the module."""
+    result: set[str] = set()
+    for cls in module.body:
+        if not isinstance(cls, ast.ClassDef):
+            continue
+        for stmt in ast.walk(cls):
+            if (
+                isinstance(stmt, ast.AnnAssign)
+                and isinstance(stmt.target, ast.Attribute)
+                and isinstance(stmt.target.value, ast.Name)
+                and stmt.target.value.id == 'self'
+                and isinstance(stmt.annotation, ast.Name)
+                and stmt.annotation.id in _PRIMITIVE_NUMERIC_NAMES
+            ):
+                result.add(stmt.target.attr)
+    return result
+
+
+def _wrap_kept_primitive_assigns(fdef: ast.FunctionDef, boxed: set[str]) -> None:
+    """For args/locals annotated primitive (kept), wrap reassigned boxed values with the primitive type."""
+    kept_primitive: dict[str, ast.expr] = {}
+    for arg in fdef.args.args:
+        if arg.annotation is not None and isinstance(arg.annotation, ast.Name) and arg.annotation.id in _PRIMITIVE_NUMERIC_NAMES:
+            kept_primitive[arg.arg] = arg.annotation
+    for stmt in ast.walk(fdef):
+        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and isinstance(stmt.annotation, ast.Name) and stmt.annotation.id in _PRIMITIVE_NUMERIC_NAMES:
+            kept_primitive[stmt.target.id] = stmt.annotation
+    if not kept_primitive:
+        return
+    for assign in ast.walk(fdef):
+        if not isinstance(assign, ast.Assign):
+            continue
+        if len(assign.targets) != 1:
+            continue
+        target = assign.targets[0]
+        if not (isinstance(target, ast.Name) and target.id in kept_primitive):
+            continue
+        if not (isinstance(assign.value, ast.Name) and assign.value.id in boxed):
+            continue
+        typ = kept_primitive[target.id]
+        assign.value = ast.copy_location(
+            ast.Call(func=ast.Name(id=typ.id, ctx=ast.Load()), args=[assign.value], keywords=[]),
+            assign.value,
+        )
 
 
 class _StaticShapeSanitizer(ast.NodeTransformer):

@@ -27,6 +27,7 @@ class PlanData:
     selected_annotation_ids: set[int] | None = None
     selected_field_types: dict[tuple[str, str], TypeSpec] | None = None
     selected_constructor_param_types: dict[tuple[str, int], TypeSpec] | None = None
+    class_bases: dict[str, str] | None = None
 
 
 def _annotations_equal(a: TypeSpec, b: TypeSpec) -> bool:
@@ -213,6 +214,13 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     class_fields = _collect_class_fields(module, aliases)
     class_init_params = _collect_class_init_params(module, aliases)
     func_classes = _collect_func_classes(module)
+    class_bases: dict[str, str] = {}
+    for stmt in module.body:
+        if isinstance(stmt, ast.ClassDef):
+            for base in stmt.bases:
+                if isinstance(base, ast.Name):
+                    class_bases[stmt.name] = base.id
+                    break
     guide_selected_ids = {key for key, value in guide.items() if isinstance(key, int) and value}
     if guide_selected_ids:
         expanded_selected_ids = set(guide_selected_ids)
@@ -336,4 +344,5 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
         selected_annotation_ids=selected_annotation_ids,
         selected_field_types=selected_field_types,
         selected_constructor_param_types=selected_constructor_param_types,
+        class_bases=class_bases,
     )
