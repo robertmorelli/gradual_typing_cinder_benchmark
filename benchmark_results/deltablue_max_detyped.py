@@ -25,46 +25,6 @@ from __static__ import CheckedList, box, cast, cbool, clen, int64, inline
 from typing import final
 import time
 
-def _repro_extract_plan_from_constraints_arg0_2(f, arg0):
-    _arg0 = CheckedList[UrnaryConstraint](arg0)
-    _out = f(_arg0)
-    if _arg0 is not arg0:
-        arg0.clear()
-        arg0.extend(_arg0)
-    return _out
-
-def _repro_extract_plan_from_constraints_arg0(f, arg0):
-    _arg0 = CheckedList[UrnaryConstraint](arg0)
-    _out = f(_arg0)
-    if _arg0 is not arg0:
-        arg0.clear()
-        arg0.extend(_arg0)
-    return _out
-
-def _repro_add_constraints_consuming_to_arg1_2(f, arg0, arg1):
-    _arg1 = CheckedList[Constraint](arg1)
-    _out = f(arg0, _arg1)
-    if _arg1 is not arg1:
-        arg1.clear()
-        arg1.extend(_arg1)
-    return _out
-
-def _repro_make_plan_arg0(f, arg0):
-    _arg0 = CheckedList[UrnaryConstraint](arg0)
-    _out = f(_arg0)
-    if _arg0 is not arg0:
-        arg0.clear()
-        arg0.extend(_arg0)
-    return _out
-
-def _repro_add_constraints_consuming_to_arg1(f, arg0, arg1):
-    _arg1 = CheckedList[Constraint](arg1)
-    _out = f(arg0, _arg1)
-    if _arg1 is not arg1:
-        arg1.clear()
-        arg1.extend(_arg1)
-    return _out
-
 @inline
 def stronger(s1, s2):
     return box(cbool(int64(cast(Strength, s1).strength) < int64(cast(Strength, s2).strength)))
@@ -380,7 +340,7 @@ class Planner(object):
             if int64(cast(Variable, c.output()).mark) != mark and cbool(c.inputs_known(box(int64(mark)))):
                 plan.add_constraint(c)
                 cast(Variable, c.output()).mark = box(int64(mark))
-                _repro_add_constraints_consuming_to_arg1(self.add_constraints_consuming_to, cast(Variable, c.output()), todo)
+                self.add_constraints_consuming_to(cast(Variable, c.output()), todo)
         return plan
 
     def extract_plan_from_constraints(self, constraints):
@@ -389,7 +349,7 @@ class Planner(object):
         for c in constraints:
             if cbool(c.is_input()) and cbool(c.is_satisfied()):
                 sources.append(c)
-        return cast(Plan, _repro_make_plan_arg0(self.make_plan, sources))
+        return cast(Plan, self.make_plan(sources))
 
     def add_propagate(self, c, mark):
         todo = CheckedList[Constraint]([])
@@ -400,7 +360,7 @@ class Planner(object):
                 self.incremental_remove(cast(Constraint, c))
                 return box(cbool(False))
             d.recalculate()
-            _repro_add_constraints_consuming_to_arg1_2(self.add_constraints_consuming_to, cast(Variable, d.output()), todo)
+            self.add_constraints_consuming_to(cast(Variable, d.output()), todo)
         return box(cbool(True))
 
     def remove_propagate_from(self, out):
@@ -496,7 +456,7 @@ def chain_test(n):
     edit = EditConstraint(first, PREFERRED)
     edits = CheckedList[UrnaryConstraint]([])
     edits.append(edit)
-    plan = cast(Plan, _repro_extract_plan_from_constraints_arg0(planner.extract_plan_from_constraints, edits))
+    plan = cast(Plan, planner.extract_plan_from_constraints(edits))
     i = box(int64(0))
     while int64(i) < 100:
         first.value = box(int64(int64(i)))
@@ -552,7 +512,7 @@ def change(v, new_value):
     edit = EditConstraint(cast(Variable, v), PREFERRED)
     edits = CheckedList[UrnaryConstraint]([])
     edits.append(edit)
-    plan = cast(Plan, _repro_extract_plan_from_constraints_arg0_2(planner.extract_plan_from_constraints, edits))
+    plan = cast(Plan, planner.extract_plan_from_constraints(edits))
     i = box(int64(0))
     while int64(i) < 10:
         cast(Variable, v).value = box(int64(int64(new_value)))

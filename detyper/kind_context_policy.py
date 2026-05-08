@@ -65,7 +65,6 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
@@ -88,7 +87,6 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
@@ -111,7 +109,6 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
