@@ -387,7 +387,7 @@ def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None, in
 def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
-    if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type['):
+    if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type[') or ' is equivalent to ' in (pyright_resolved or '') or 'There is no runtime checking' in (pyright_resolved or ''):
         pyright_resolved = None
     resolved = pyright_resolved or (aliases or {}).get(annotation_src or '') or annotation_src
     type_meta = classification_metadata(resolved, aliases=set((aliases or {}).keys()), int_enums=int_enums)

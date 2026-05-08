@@ -77,9 +77,9 @@ DEFAULT_RULES: tuple[TypeRule, ...] = (
     TypeRule('cinder_static_container', exact=frozenset({'Array', 'Vector'}), prefixes=('Array[', 'Vector[')),
     TypeRule('python_scalar', exact=frozenset({'int', 'float', 'bool', 'str', 'bytes'})),
     TypeRule('python_tuple', exact=frozenset({'tuple', 'Tuple'}), prefixes=('tuple[', 'Tuple[')),
-    TypeRule('python_container', exact=frozenset({'list', 'dict', 'set', 'List', 'Dict', 'Set'}), prefixes=(
+    TypeRule('python_container', exact=frozenset({'list', 'dict', 'set', 'List', 'Dict', 'Set', 'Mapping'}), prefixes=(
         'list[', 'dict[', 'set[',
-        'List[', 'Dict[', 'Set[',
+        'List[', 'Dict[', 'Set[', 'Mapping[',
     )),
 )
 

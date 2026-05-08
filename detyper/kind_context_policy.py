@@ -266,7 +266,9 @@ POLICY.update({
         'python_scalar': {'dynamic_any': {}},
         'python_tuple': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+        }},
         'optional': {'dynamic_any': {}},
         'union': {'dynamic_any': {}},
         'iterator': {'dynamic_any': {}},
@@ -323,6 +325,9 @@ for context in [
             Place.FIELD_READS: ('wrap_runtime_type',),
         }},
         'cinder_checked_container': {'dynamic_any': {}},
+        'cinder_static_container': {'dynamic_any': {
+            Place.FIELD_READS: ('wrap_runtime_type',),
+        }},
         'python_scalar': {'dynamic_any': {}},
         'python_tuple': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {
@@ -417,7 +422,9 @@ for _context in ['function_parameter_annotation_with_optional', 'method_paramete
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
         }},
-        'optional': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {
+            Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+        }},
         'union': {'dynamic_any': {}},
         'iterator': {'dynamic_any': {}},
         'dynamic_unknown': {'dynamic_any': {}},

@@ -24,6 +24,19 @@ def _type_expr(src: str | None) -> ast.expr | None:
         return None
 
 
+def _nonnull_type_expr(annotation_src: str | None, resolved_src: str | None) -> ast.expr | None:
+    for src in (annotation_src or '', resolved_src or ''):
+        if src.startswith('Final[') and src.endswith(']'):
+            return _type_expr(src[len('Final['):-1])
+        if src.startswith('Optional[') and src.endswith(']'):
+            return _type_expr(src[len('Optional['):-1])
+        if '|' in src:
+            parts = [part.strip() for part in src.split('|') if part.strip() not in {'None', 'NoneType'}]
+            if len(parts) == 1:
+                return _type_expr(parts[0])
+    return _type_expr(resolved_src) or _type_expr(annotation_src)
+
+
 def _wrap_args(action: Action, typ: ast.expr | None) -> list[Arg]:
     if action in (Action.WRAP_RUNTIME_TYPE, Action.WRAP_NONNULL_RUNTIME_TYPE):
         return [Arg(None, typ, wrap_order=0)]
@@ -160,7 +173,7 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
                     if action == Action.REWRITE_PARAM_BINDING and isinstance(node, ast.arg) and isinstance(context, ast.FunctionDef):
                         detyper.add(make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name))
                         continue
-                    action_typ = _type_expr(rec.get('resolved_type_src')) if action == Action.WRAP_NONNULL_RUNTIME_TYPE else typ
+                    action_typ = _nonnull_type_expr(rec.get('annotation_src'), rec.get('resolved_type_src')) if action == Action.WRAP_NONNULL_RUNTIME_TYPE else typ
                     if wrap_args := _wrap_args(action, action_typ):
                         target_context = _annotation_context(target, tree)
                         detyper.add(make_wrap_intent(target, target_context, wrap_args, _func_name(target_context)))
