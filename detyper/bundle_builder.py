@@ -131,7 +131,11 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
             return
         node = tree.detyping_node_index[int(annotation_id)]
         context = _annotation_context(node, tree)
-        typ = _type_expr(rec.get('resolved_type_src'))
+        type_src = rec.get('resolved_type_src')
+        annotation_src = rec.get('annotation_src')
+        if annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
+            type_src = annotation_src
+        typ = _type_expr(type_src)
         context_name = _func_name(context)
         detyper.add(make_remove_annotation_intent(node, context, [Arg(None, None)], context_name))
         places = _places(node, rec, tree)
