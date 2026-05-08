@@ -19,6 +19,7 @@ TypeKind = Literal[
     'python_scalar',
     'python_container',
     'python_user_object',
+    'int_enum',
     'none_only',
     'optional',
     'union',
@@ -54,6 +55,7 @@ class TypeClassifierConfig:
         ('builtins.', ''),
     )
     alias_names: frozenset[str] = frozenset()
+    int_enum_names: frozenset[str] = frozenset()
     rules: tuple[TypeRule, ...] = field(default_factory=lambda: DEFAULT_RULES)
 
 
@@ -88,20 +90,22 @@ def normalize_type_name(type_src: str | None, config: TypeClassifierConfig | Non
     return text.strip()
 
 
-def classify_type_src(type_src: str | None, *, aliases: set[str] | None = None, config: TypeClassifierConfig | None = None) -> TypeKind:
-    config = config or TypeClassifierConfig(alias_names=frozenset(aliases or ()))
+def classify_type_src(type_src: str | None, *, aliases: set[str] | None = None, int_enums: set[str] | None = None, config: TypeClassifierConfig | None = None) -> TypeKind:
+    config = config or TypeClassifierConfig(alias_names=frozenset(aliases or ()), int_enum_names=frozenset(int_enums or ()))
     text = normalize_type_name(type_src, config)
     if text in config.alias_names:
         return 'type_alias'
+    if text in config.int_enum_names or text.split('.')[-1] in config.int_enum_names:
+        return 'int_enum'
     for rule in config.rules:
         if rule.matches(text):
             return rule.kind
     return 'python_user_object'
 
 
-def classification_metadata(type_src: str | None, *, aliases: set[str] | None = None) -> dict[str, str]:
+def classification_metadata(type_src: str | None, *, aliases: set[str] | None = None, int_enums: set[str] | None = None) -> dict[str, str]:
     normalized = normalize_type_name(type_src)
     return {
         'normalized_type_src': normalized,
-        'type_kind': classify_type_src(normalized, aliases=aliases),
+        'type_kind': classify_type_src(normalized, aliases=aliases, int_enums=int_enums),
     }

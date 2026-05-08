@@ -10,7 +10,7 @@ import ast
 
 from .ast_data import AstData, ast_from_data
 from .kind_context_policy import Action, Place, policy_for
-from .intent_types import Arg, intent_to_json, make_preserve_argument_mutations_intent, make_remove_annotation_intent, make_wrap_intent
+from .intent_types import Arg, intent_to_json, make_preserve_argument_mutations_intent, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent
 from .intent_unifiers import IntentSet
 
 
@@ -147,8 +147,15 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
                         detyper.add(make_remove_annotation_intent(target, _annotation_context(target, tree), [Arg(None, None)], _func_name(_annotation_context(target, tree))))
                         continue
                     if action == Action.PRESERVE_ARGUMENT_MUTATIONS:
-                        target_context = _annotation_context(target, tree)
-                        detyper.add(make_preserve_argument_mutations_intent(target, target_context, [Arg(None, typ)], _func_name(target_context)))
+                        call_arg = tree.detyping_indexes.get('call_arg_uses', {}).get(str(target.detyping_id), {})
+                        call_id = call_arg.get('call_id')
+                        arg_index = call_arg.get('arg_index')
+                        if call_id is not None and arg_index is not None:
+                            call_node = tree.detyping_node_index[int(call_id)]
+                            detyper.add(make_preserve_argument_mutations_intent(call_node, tree, [Arg(int(arg_index), typ)], '<module>'))
+                        continue
+                    if action == Action.REWRITE_PARAM_BINDING and isinstance(node, ast.arg) and isinstance(context, ast.FunctionDef):
+                        detyper.add(make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name))
                         continue
                     if wrap_args := _wrap_args(action, typ):
                         target_context = _annotation_context(target, tree)

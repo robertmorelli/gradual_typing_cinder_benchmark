@@ -4,3 +4,17 @@ __pycache__
 .*/
 *.diff
 benchmark_results/*/files
+
+# detyper experiment scratch/output
+benchmark_results/all_kind_context_matrices/
+benchmark_results/pairwise/
+benchmark_results/random_samples/
+benchmark_results/runtime_kind_context_matrices/
+benchmark_results/deltablue_logic_ddmin/
+benchmark_results/deltablue_runtime_ddmin/
+benchmark_results/*_runtime_ddmin/
+benchmark_results/*_logic_ddmin/
+benchmark_results/**/*_n100.py
+benchmark_results/**/*_runtime_fixed.py
+benchmark_results/**/*_no_direction_casts.py
+benchmark_results/**/*_intenum_policy.py

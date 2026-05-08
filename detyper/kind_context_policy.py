@@ -63,6 +63,10 @@ POLICY: PolicyTable = {
             Place.LOCAL_READS: ('wrap_runtime_type',),
             Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
         }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
+        }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
@@ -83,7 +87,8 @@ POLICY: PolicyTable = {
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
         'cinder_checked_container': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
@@ -103,6 +108,10 @@ POLICY: PolicyTable = {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
             Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
@@ -184,7 +193,6 @@ for context in [
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-            Place.LOCAL_READS: ('wrap_runtime_type',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
@@ -278,6 +286,14 @@ for context in [
         'union': {'dynamic_any': {}},
         'dynamic_unknown': {'dynamic_any': {}},
     }
+
+# IntEnum is not normal object. It is object-shaped to typechecker but int-like
+# and identity-sensitive at runtime. Casts around IntEnum state changed
+# DeltaBlue's planner direction decisions, so detyping IntEnum is annotation-only
+# unless a future benchmark proves a specific boundary needs help.
+for _context, _by_source in POLICY.items():
+    if 'python_user_object' in _by_source:
+        _by_source.setdefault('int_enum', {'dynamic_any': {}})
 
 
 def policy_for(context: str, source_kind: str, target_kind: str = 'dynamic_any') -> dict[Place, tuple[Action, ...]]:

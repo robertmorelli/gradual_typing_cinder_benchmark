@@ -143,8 +143,21 @@ def _apply_preserve_argument_mutations(intent: Intent, nodes: dict[int, AST]) ->
 
     for arg in sorted_args:
         idx = arg.index
-        body_stmts.append(ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='clear', ctx=ast.Load()), args=[], keywords=[])))
-        body_stmts.append(ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='extend', ctx=ast.Load()), args=[ast.Name(id=f'_arg{idx}', ctx=ast.Load())], keywords=[])))
+        # CheckedList[T](arg) may return arg itself when arg is already the
+        # right checked-list kind. Do not clear/extend in that case or we erase
+        # the very mutations we are trying to preserve.
+        body_stmts.append(ast.If(
+            test=ast.Compare(
+                left=ast.Name(id=f'_arg{idx}', ctx=ast.Load()),
+                ops=[ast.IsNot()],
+                comparators=[ast.Name(id=f'arg{idx}', ctx=ast.Load())],
+            ),
+            body=[
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='clear', ctx=ast.Load()), args=[], keywords=[])),
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='extend', ctx=ast.Load()), args=[ast.Name(id=f'_arg{idx}', ctx=ast.Load())], keywords=[])),
+            ],
+            orelse=[],
+        ))
     body_stmts.append(ast.Return(value=ast.Name(id='_out', ctx=ast.Load())))
 
     wrapper = FunctionDef(

@@ -370,11 +370,11 @@ def _callee(call: ast.Call) -> dict[str, Any]:
     return {'kind': 'dynamic', 'name': None, 'func_id': getattr(call.func, 'detyping_id', None)}
 
 
-def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None) -> dict[str, Any]:
+def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     raw = _clean_pyright_type(getattr(node, 'pyright_type', None))
     if raw in {'Unknown', 'Any'}:
         raw = None
-    meta = classification_metadata(raw, aliases=set((aliases or {}).keys()))
+    meta = classification_metadata(raw, aliases=set((aliases or {}).keys()), int_enums=int_enums)
     return {
         'pyright_type_src': raw,
         'pyright_normalized_type_src': meta['normalized_type_src'],
@@ -382,13 +382,13 @@ def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None) ->
     }
 
 
-def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None) -> dict[str, Any]:
+def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
     if pyright_resolved in {'Unknown', 'Any'}:
         pyright_resolved = None
     resolved = pyright_resolved or (aliases or {}).get(annotation_src or '') or annotation_src
-    type_meta = classification_metadata(resolved, aliases=set((aliases or {}).keys()))
+    type_meta = classification_metadata(resolved, aliases=set((aliases or {}).keys()), int_enums=int_enums)
     return {
         'id': node.detyping_id,
         'context': kind,
@@ -416,6 +416,10 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         functions_by_name.setdefault(info['name'], []).append(int(raw_id))
 
     classes_by_name: dict[str, int] = {info['name']: int(raw_id) for raw_id, info in base.classes.items()}
+    int_enum_names = {
+        info['name'] for info in base.classes.values()
+        if 'IntEnum' in info.get('base_names', []) or 'enum.IntEnum' in info.get('base_names', [])
+    }
 
     aliases: dict[str, str] = {}
     for node in by_id.values():
@@ -442,7 +446,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                     kind = 'method_self_parameter_annotation' if idx == 0 and arg.arg == 'self' else 'method_parameter_annotation'
                 else:
                     kind = 'function_parameter_annotation'
-                rec = _annotation_record(arg, kind=kind, annotation=arg.annotation, function_id=func_id, class_id=info['class_id'], name=arg.arg, param_index=idx, aliases=aliases)
+                rec = _annotation_record(arg, kind=kind, annotation=arg.annotation, function_id=func_id, class_id=info['class_id'], name=arg.arg, param_index=idx, aliases=aliases, int_enums=int_enum_names)
                 annotations[str(arg.detyping_id)] = rec
                 annotations_by_function.setdefault(str(func_id), []).append(arg.detyping_id)
         if isinstance(fdef, (ast.FunctionDef, ast.AsyncFunctionDef)) and fdef.returns is not None:
@@ -452,7 +456,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 kind = 'method_return_annotation'
             else:
                 kind = 'function_return_annotation'
-            rec = _annotation_record(fdef, kind=kind, annotation=fdef.returns, function_id=func_id, class_id=info['class_id'], name=info['name'], aliases=aliases)
+            rec = _annotation_record(fdef, kind=kind, annotation=fdef.returns, function_id=func_id, class_id=info['class_id'], name=info['name'], aliases=aliases, int_enums=int_enum_names)
             annotations[str(fdef.detyping_id)] = rec
             annotations_by_function.setdefault(str(func_id), []).append(fdef.detyping_id)
     for node in by_id.values():
@@ -477,7 +481,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 kind = f'constructor_local_annotation_{"with_value" if has_value else "no_value"}'
             else:
                 kind = f'method_local_annotation_{"with_value" if has_value else "no_value"}'
-            rec = _annotation_record(node, kind=kind, annotation=node.annotation, function_id=func_id, class_id=class_id, name=target_name, aliases=aliases)
+            rec = _annotation_record(node, kind=kind, annotation=node.annotation, function_id=func_id, class_id=class_id, name=target_name, aliases=aliases, int_enums=int_enum_names)
             annotations[str(node.detyping_id)] = rec
             if func_id is not None:
                 annotations_by_function.setdefault(str(func_id), []).append(node.detyping_id)
@@ -661,7 +665,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                         'target_context': ann_rec.get('context'),
                         'target_type_kind': ann_rec.get('type_kind'),
                         'target_type_src': ann_rec.get('resolved_type_src'),
-                        **_expr_type_metadata(parent.value, aliases),
+                        **_expr_type_metadata(parent.value, aliases, int_enum_names),
                     }
         if rhs_ids:
             reassign_rhs_by_annotation[ann_id] = sorted(set(rhs_ids))
@@ -690,7 +694,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                         'target_context': ann_rec.get('context'),
                         'target_type_kind': ann_rec.get('type_kind'),
                         'target_type_src': ann_rec.get('resolved_type_src'),
-                        **_expr_type_metadata(parent.value, aliases),
+                        **_expr_type_metadata(parent.value, aliases, int_enum_names),
                     }
         if ann_id is not None and rhs_ids:
             field_reassign_rhs_by_annotation[str(ann_id)] = sorted(set(rhs_ids))
@@ -714,7 +718,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 'field_context': ann_rec.get('context'),
                 'field_type_kind': ann_rec.get('type_kind'),
                 'field_type_src': ann_rec.get('resolved_type_src'),
-                **_expr_type_metadata(attr, aliases),
+                **_expr_type_metadata(attr, aliases, int_enum_names),
             }
     for ids in field_reads_by_annotation.values():
         ids.sort()
@@ -768,7 +772,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             'callee_param_context': param_rec.get('context'),
             'callee_param_type_kind': param_rec.get('type_kind'),
             'callee_param_type_src': param_rec.get('resolved_type_src'),
-            **_expr_type_metadata(by_id[arg_id], aliases),
+            **_expr_type_metadata(by_id[arg_id], aliases, int_enum_names),
             **_arg_binding_metadata(by_id[arg_id]),
         }
         call_arg_uses[str(arg_id)] = rec
@@ -873,12 +877,13 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                     'return_context': ann_rec.get('context'),
                     'return_type_kind': ann_rec.get('type_kind'),
                     'return_type_src': ann_rec.get('resolved_type_src'),
-                    **_expr_type_metadata(call_node, aliases),
+                    **_expr_type_metadata(call_node, aliases, int_enum_names),
                 }
 
     return {
         'aliases': aliases,
-        'alias_type_metadata': {alias: classification_metadata(target, aliases=set(aliases.keys())) for alias, target in aliases.items()},
+        'int_enum_names': sorted(int_enum_names),
+        'alias_type_metadata': {alias: classification_metadata(target, aliases=set(aliases.keys()), int_enums=int_enum_names) for alias, target in aliases.items()},
         'functions': base.functions,
         'functions_by_name': functions_by_name,
         'function_uses': function_uses,

@@ -25,6 +25,46 @@ from __static__ import CheckedList, box, cast, cbool, clen, int64, inline
 from typing import final
 import time
 
+def _repro_extract_plan_from_constraints_arg0_2(f, arg0):
+    _arg0 = CheckedList[UrnaryConstraint](arg0)
+    _out = f(_arg0)
+    if _arg0 is not arg0:
+        arg0.clear()
+        arg0.extend(_arg0)
+    return _out
+
+def _repro_extract_plan_from_constraints_arg0(f, arg0):
+    _arg0 = CheckedList[UrnaryConstraint](arg0)
+    _out = f(_arg0)
+    if _arg0 is not arg0:
+        arg0.clear()
+        arg0.extend(_arg0)
+    return _out
+
+def _repro_add_constraints_consuming_to_arg1_2(f, arg0, arg1):
+    _arg1 = CheckedList[Constraint](arg1)
+    _out = f(arg0, _arg1)
+    if _arg1 is not arg1:
+        arg1.clear()
+        arg1.extend(_arg1)
+    return _out
+
+def _repro_make_plan_arg0(f, arg0):
+    _arg0 = CheckedList[UrnaryConstraint](arg0)
+    _out = f(_arg0)
+    if _arg0 is not arg0:
+        arg0.clear()
+        arg0.extend(_arg0)
+    return _out
+
+def _repro_add_constraints_consuming_to_arg1(f, arg0, arg1):
+    _arg1 = CheckedList[Constraint](arg1)
+    _out = f(arg0, _arg1)
+    if _arg1 is not arg1:
+        arg1.clear()
+        arg1.extend(_arg1)
+    return _out
+
 @inline
 def stronger(s1, s2):
     return box(cbool(int64(cast(Strength, s1).strength) < int64(cast(Strength, s2).strength)))
@@ -174,31 +214,31 @@ class BinaryConstraint(Constraint):
     def choose_method(self, mark):
         if int64(cast(Variable, self.v1).mark) == int64(mark):
             if int64(cast(Variable, self.v2).mark) != int64(mark) and cbool(stronger(cast(Strength, self.strength), cast(Strength, cast(Variable, self.v2).walk_strength))):
-                self.direction = cast(Direction, Direction.FORWARD)
+                self.direction = Direction.FORWARD
             else:
-                self.direction = cast(Direction, Direction.BACKWARD)
+                self.direction = Direction.BACKWARD
         if int64(cast(Variable, self.v2).mark) == int64(mark):
             if int64(cast(Variable, self.v1).mark) != int64(mark) and cbool(stronger(cast(Strength, self.strength), cast(Strength, cast(Variable, self.v1).walk_strength))):
-                self.direction = cast(Direction, Direction.BACKWARD)
+                self.direction = Direction.BACKWARD
             else:
-                self.direction = cast(Direction, Direction.NONE)
+                self.direction = Direction.NONE
         if cbool(weaker(cast(Strength, cast(Variable, self.v1).walk_strength), cast(Strength, cast(Variable, self.v2).walk_strength))):
             if cbool(stronger(cast(Strength, self.strength), cast(Strength, cast(Variable, self.v1).walk_strength))):
-                self.direction = cast(Direction, Direction.BACKWARD)
+                self.direction = Direction.BACKWARD
             else:
-                self.direction = cast(Direction, Direction.NONE)
+                self.direction = Direction.NONE
         elif cbool(stronger(cast(Strength, self.strength), cast(Strength, cast(Variable, self.v2).walk_strength))):
-            self.direction = cast(Direction, Direction.FORWARD)
+            self.direction = Direction.FORWARD
         else:
-            self.direction = cast(Direction, Direction.BACKWARD)
+            self.direction = Direction.BACKWARD
 
     def add_to_graph(self):
         cast(Variable, self.v1).add_constraint(self)
         cast(Variable, self.v2).add_constraint(self)
-        self.direction = cast(Direction, Direction.NONE)
+        self.direction = Direction.NONE
 
     def is_satisfied(self):
-        if cast(Direction, self.direction) != Direction.NONE:
+        if self.direction != Direction.NONE:
             return box(cbool(True))
         return box(cbool(False))
 
@@ -206,10 +246,10 @@ class BinaryConstraint(Constraint):
         cast(Variable, self.input()).mark = box(int64(int64(mark)))
 
     def input(self):
-        return cast(Variable, self.v1) if cast(Direction, self.direction) == Direction.FORWARD else cast(Variable, self.v2)
+        return cast(Variable, self.v1) if self.direction == Direction.FORWARD else cast(Variable, self.v2)
 
     def output(self):
-        return cast(Variable, self.v2) if cast(Direction, self.direction) == Direction.FORWARD else cast(Variable, self.v1)
+        return cast(Variable, self.v2) if self.direction == Direction.FORWARD else cast(Variable, self.v1)
 
     def recalculate(self):
         ihn = cast(Variable, self.input())
@@ -220,7 +260,7 @@ class BinaryConstraint(Constraint):
             self.execute()
 
     def mark_unsatisfied(self):
-        self.direction = cast(Direction, Direction.NONE)
+        self.direction = Direction.NONE
 
     def inputs_known(self, mark):
         i = cast(Variable, self.input())
@@ -231,7 +271,7 @@ class BinaryConstraint(Constraint):
             cast(Variable, self.v1).remove_constraint(self)
         if cast(Variable, self.v2) is not None:
             cast(Variable, self.v2).remove_constraint(self)
-        self.direction = cast(Direction, Direction.NONE)
+        self.direction = Direction.NONE
 
 @final
 class ScaleConstraint(BinaryConstraint):
@@ -260,7 +300,7 @@ class ScaleConstraint(BinaryConstraint):
         cast(Variable, self.offset).mark = box(int64(int64(mark)))
 
     def execute(self):
-        if cast(Direction, self.direction) == Direction.FORWARD:
+        if self.direction == Direction.FORWARD:
             cast(Variable, self.v2).value = box(int64(int64(cast(Variable, self.v1).value) * int64(cast(Variable, self.scale).value) + int64(cast(Variable, self.offset).value)))
         else:
             cast(Variable, self.v1).value = box(int64((int64(cast(Variable, self.v2).value) - int64(cast(Variable, self.offset).value)) / int64(cast(Variable, self.scale).value)))
@@ -331,34 +371,36 @@ class Planner(object):
         return box(int64(int64(self.current_mark)))
 
     def make_plan(self, sources):
+        sources = cast(CheckedList[UrnaryConstraint], sources)
         mark = int64(self.new_mark())
         plan = Plan()
-        todo = CheckedList[Constraint]([s for s in CheckedList[UrnaryConstraint](sources)])
-        while clen(CheckedList[Constraint](todo)):
-            c = CheckedList[Constraint](todo).pop(0)
+        todo = CheckedList[Constraint]([s for s in sources])
+        while clen(todo):
+            c = todo.pop(0)
             if int64(cast(Variable, c.output()).mark) != mark and cbool(c.inputs_known(box(int64(mark)))):
                 plan.add_constraint(c)
                 cast(Variable, c.output()).mark = box(int64(mark))
-                self.add_constraints_consuming_to(cast(Variable, c.output()), CheckedList[Constraint](todo))
+                _repro_add_constraints_consuming_to_arg1(self.add_constraints_consuming_to, cast(Variable, c.output()), todo)
         return plan
 
     def extract_plan_from_constraints(self, constraints):
+        constraints = cast(CheckedList[UrnaryConstraint], constraints)
         sources = CheckedList[UrnaryConstraint]([])
-        for c in CheckedList[UrnaryConstraint](constraints):
+        for c in constraints:
             if cbool(c.is_input()) and cbool(c.is_satisfied()):
-                CheckedList[UrnaryConstraint](sources).append(c)
-        return cast(Plan, self.make_plan(CheckedList[UrnaryConstraint](sources)))
+                sources.append(c)
+        return cast(Plan, _repro_make_plan_arg0(self.make_plan, sources))
 
     def add_propagate(self, c, mark):
         todo = CheckedList[Constraint]([])
-        CheckedList[Constraint](todo).append(cast(Constraint, c))
-        while clen(CheckedList[Constraint](todo)):
-            d = CheckedList[Constraint](todo).pop(0)
+        todo.append(cast(Constraint, c))
+        while clen(todo):
+            d = todo.pop(0)
             if int64(cast(Variable, d.output()).mark) == int64(mark):
                 self.incremental_remove(cast(Constraint, c))
                 return box(cbool(False))
             d.recalculate()
-            self.add_constraints_consuming_to(cast(Variable, d.output()), CheckedList[Constraint](todo))
+            _repro_add_constraints_consuming_to_arg1_2(self.add_constraints_consuming_to, cast(Variable, d.output()), todo)
         return box(cbool(True))
 
     def remove_propagate_from(self, out):
@@ -367,26 +409,27 @@ class Planner(object):
         cast(Variable, out).stay = box(cbool(True))
         unsatisfied = CheckedList[Constraint]([])
         todo = CheckedList[Variable]([])
-        CheckedList[Variable](todo).append(cast(Variable, out))
-        while len(CheckedList[Variable](todo)):
-            v = CheckedList[Variable](todo).pop(0)
+        todo.append(cast(Variable, out))
+        while len(todo):
+            v = todo.pop(0)
             cs = v.constraints
             for c in cs:
                 if not cbool(c.is_satisfied()):
-                    CheckedList[Constraint](unsatisfied).append(c)
+                    unsatisfied.append(c)
             determining = cast(Constraint | None, v.determined_by)
             for c in cs:
                 if c != determining and cbool(c.is_satisfied()):
                     c.recalculate()
-                    CheckedList[Variable](todo).append(cast(Variable, c.output()))
-        return CheckedList[Constraint](unsatisfied)
+                    todo.append(cast(Variable, c.output()))
+        return unsatisfied
 
     def add_constraints_consuming_to(self, v, coll):
+        coll = cast(CheckedList[Constraint], coll)
         determining = cast(Constraint | None, cast(Variable, v).determined_by)
         cc = cast(Variable, v).constraints
         for c in cc:
             if c != determining and cbool(c.is_satisfied()):
-                CheckedList[Constraint](coll).append(c)
+                coll.append(c)
 
 @final
 class Plan(object):
@@ -452,8 +495,8 @@ def chain_test(n):
     StayConstraint(last, STRONG_DEFAULT)
     edit = EditConstraint(first, PREFERRED)
     edits = CheckedList[UrnaryConstraint]([])
-    CheckedList[UrnaryConstraint](edits).append(edit)
-    plan = cast(Plan, planner.extract_plan_from_constraints(CheckedList[UrnaryConstraint](edits)))
+    edits.append(edit)
+    plan = cast(Plan, _repro_extract_plan_from_constraints_arg0(planner.extract_plan_from_constraints, edits))
     i = box(int64(0))
     while int64(i) < 100:
         first.value = box(int64(int64(i)))
@@ -480,7 +523,7 @@ def projection_test(n):
         bi = i
         src = Variable('src%s' % bi, i)
         dst = Variable('dst%s' % bi, i)
-        CheckedList[Variable](dests).append(dst)
+        dests.append(dst)
         StayConstraint(src, NORMAL)
         ScaleConstraint(src, scale, offset, dst, REQUIRED)
         i = box(int64(int64(i) + 1))
@@ -494,13 +537,13 @@ def projection_test(n):
     change(scale, box(int64(5)))
     i = box(int64(0))
     while int64(i) < int64(n) - 1:
-        if int64(CheckedList[Variable](dests)[int64(i)].value) != int64(i) * 5 + 1000:
+        if int64(dests[int64(i)].value) != int64(i) * 5 + 1000:
             print('Projection 3 failed')
         i = box(int64(int64(i) + 1))
     change(offset, box(int64(2000)))
     i = box(int64(0))
     while int64(i) < int64(n) - 1:
-        if int64(CheckedList[Variable](dests)[int64(i)].value) != int64(i) * 5 + 2000:
+        if int64(dests[int64(i)].value) != int64(i) * 5 + 2000:
             print('Projection 4 failed')
         i = box(int64(int64(i) + 1))
 
@@ -508,8 +551,8 @@ def change(v, new_value):
     planner = cast(Planner, get_planner())
     edit = EditConstraint(cast(Variable, v), PREFERRED)
     edits = CheckedList[UrnaryConstraint]([])
-    CheckedList[UrnaryConstraint](edits).append(edit)
-    plan = cast(Plan, planner.extract_plan_from_constraints(CheckedList[UrnaryConstraint](edits)))
+    edits.append(edit)
+    plan = cast(Plan, _repro_extract_plan_from_constraints_arg0_2(planner.extract_plan_from_constraints, edits))
     i = box(int64(0))
     while int64(i) < 10:
         cast(Variable, v).value = box(int64(int64(new_value)))
