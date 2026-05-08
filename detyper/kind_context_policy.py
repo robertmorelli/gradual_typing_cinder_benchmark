@@ -1,0 +1,292 @@
+"""Context/source/target policy table for staged detyping/retyping.
+
+Stage 2 reads annotation metadata from ast_data.json, looks up
+POLICY[context][source_kind][target_kind], then applies each action to its named
+place of interest.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+from typing import TypeAlias
+
+
+class Place(StrEnum):
+    ANNOTATION_SITE = 'annotation_site'
+    ANNOTATED_VALUE = 'annotated_value'
+    LOCAL_READS = 'local_reads'
+    LOCAL_WRITES = 'local_writes'
+    REASSIGN_RHS = 'reassign_rhs'
+    FIELD_REASSIGN_RHS = 'field_reassign_rhs'
+    FUNCTION_CALL_SITES = 'function_call_sites'
+    METHOD_CALL_SITES = 'method_call_sites'
+    CALL_ARG_TO_DETYPED_PARAM = 'call_arg_to_detyped_param'
+    CALL_ARG_TO_TYPED_PARAM = 'call_arg_to_typed_param'
+    CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR = 'call_arg_to_detyped_param_from_cinder_scalar'
+    CALL_ARG_TO_DETYPED_PARAM_FROM_PYTHON_OBJECT = 'call_arg_to_detyped_param_from_python_object'
+    CALL_RESULT_FROM_DETYPED_RETURN = 'call_result_from_detyped_return'
+    RETURN_VALUES = 'return_values'
+    FIELD_READS = 'field_reads'
+    FIELD_WRITES = 'field_writes'
+    CONSTRUCTOR_CALL_ARGS = 'constructor_call_args'
+    MODULE_GLOBAL_READS = 'module_global_reads'
+    MODULE_GLOBAL_WRITES = 'module_global_writes'
+    CLASS_ATTRIBUTE_READS = 'class_attribute_reads'
+    CLASS_ATTRIBUTE_WRITES = 'class_attribute_writes'
+    OVERRIDE_FAMILY_ANNOTATION_SITES = 'override_family_annotation_sites'
+    INSTANCE_FIELD_READS = 'instance_field_reads'
+    INSTANCE_FIELD_WRITES = 'instance_field_writes'
+
+
+class Action(StrEnum):
+    REMOVE_ANNOTATION = 'remove_annotation'
+    REWRITE_PARAM_BINDING = 'rewrite_param_binding'
+    WRAP_RUNTIME_TYPE = 'wrap_runtime_type'
+    WRAP_BOX = 'wrap_box'
+    WRAP_RUNTIME_TYPE_THEN_BOX = 'wrap_runtime_type_then_box'
+    UNWRAP_BOX = 'unwrap_box'
+    PRESERVE_ARGUMENT_MUTATIONS = 'preserve_argument_mutations'
+    UNWRAP_CHECKED_RETURN_VALUE = 'unwrap_checked_return_value'
+
+
+PolicyForPlaces: TypeAlias = dict[Place | str, tuple[Action | str, ...] | list[Action | str]]
+PolicyByTarget: TypeAlias = dict[str, PolicyForPlaces]
+PolicyBySource: TypeAlias = dict[str, PolicyByTarget]
+PolicyTable: TypeAlias = dict[str, PolicyBySource]
+
+
+# One big table. No clever shared policy aliases: when a square breaks, edit the
+# square bob is looking at.
+POLICY: PolicyTable = {
+    'function_parameter_annotation': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+        }},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'method_self_parameter_annotation': {
+        'python_user_object': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'method_parameter_annotation': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR: ('wrap_runtime_type_then_box',),
+        }},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'constructor_self_parameter_annotation': {
+        'python_user_object': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'constructor_parameter_annotation': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'function_return_annotation': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+        }},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'none_only': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'method_return_annotation': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
+            Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {}},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'none_only': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_box',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'constructor_return_annotation': {
+        'none_only': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+}
+
+for context in [
+    'function_local_annotation_no_value', 'method_local_annotation_no_value', 'constructor_local_annotation_no_value',
+]:
+    POLICY[context] = {
+        'cinder_scalar': {'dynamic_any': {
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.LOCAL_WRITES: ('wrap_box',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    }
+
+for context in [
+    'function_local_annotation_with_value', 'method_local_annotation_with_value', 'constructor_local_annotation_with_value',
+]:
+    POLICY[context] = {
+        'cinder_scalar': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    }
+
+POLICY.update({
+    'module_global_annotation_no_value': {
+        'cinder_scalar': {'dynamic_any': {}},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'module_global_annotation_with_value': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+            Place.LOCAL_WRITES: ('wrap_box',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+            Place.LOCAL_READS: ('wrap_runtime_type',),
+            Place.MODULE_GLOBAL_READS: ('wrap_runtime_type',),
+            Place.FUNCTION_CALL_SITES: ('preserve_argument_mutations',),
+            Place.METHOD_CALL_SITES: ('preserve_argument_mutations',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'class_attribute_annotation_no_value': {
+        'cinder_scalar': {'dynamic_any': {}},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+    'class_attribute_annotation_with_value': {
+        'cinder_scalar': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+            Place.LOCAL_WRITES: ('wrap_box',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    },
+})
+
+for context in [
+    'init_instance_variable_annotation_no_value', 'non_init_instance_variable_annotation_no_value',
+]:
+    POLICY[context] = {
+        'cinder_scalar': {'dynamic_any': {
+            Place.INSTANCE_FIELD_WRITES: ('wrap_runtime_type_then_box',),
+            Place.INSTANCE_FIELD_READS: ('wrap_runtime_type',),
+        }},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    }
+
+for context in [
+    'init_instance_variable_annotation_with_value', 'non_init_instance_variable_annotation_with_value',
+]:
+    POLICY[context] = {
+        'cinder_scalar': {'dynamic_any': {
+            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+            Place.FIELD_REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+            Place.FIELD_READS: ('wrap_runtime_type',),
+        }},
+        'cinder_checked_container': {'dynamic_any': {}},
+        'python_scalar': {'dynamic_any': {}},
+        'python_container': {'dynamic_any': {}},
+        'python_user_object': {'dynamic_any': {
+            Place.FIELD_REASSIGN_RHS: ('wrap_runtime_type',),
+            Place.FIELD_READS: ('wrap_runtime_type',),
+        }},
+        'optional': {'dynamic_any': {}},
+        'union': {'dynamic_any': {}},
+        'dynamic_unknown': {'dynamic_any': {}},
+    }
+
+
+def policy_for(context: str, source_kind: str, target_kind: str = 'dynamic_any') -> dict[Place, tuple[Action, ...]]:
+    raw = POLICY.get(context, {}).get(source_kind, {}).get(target_kind, {})
+    return {
+        Place(place): tuple(Action(action) for action in actions)
+        for place, actions in raw.items()
+    }
+
+
+def policy_to_json(policy: PolicyForPlaces) -> dict[str, list[str]]:
+    return {str(Place(place).value): [Action(action).value for action in actions] for place, actions in policy.items()}

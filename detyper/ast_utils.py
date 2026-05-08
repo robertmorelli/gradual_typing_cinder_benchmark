@@ -9,6 +9,9 @@ from typing import Callable
 
 def node_index(tree: AST) -> dict[int, AST]:
     """Map deterministic node ids to AST nodes."""
+    indexed = getattr(tree, 'detyping_node_index', None)
+    if indexed is not None:
+        return indexed
     return {node.detyping_id: node for node in ast.walk(tree) if hasattr(node, 'detyping_id')}
 
 
@@ -46,6 +49,11 @@ class _FunctionCollector(ast.NodeVisitor):
 
 
 def all_function_defs(tree: AST) -> list[FunctionDef]:
+    indexes = getattr(tree, 'detyping_indexes', None)
+    by_id = getattr(tree, 'detyping_node_index', None)
+    if indexes is not None and by_id is not None:
+        ids = sorted(int(item) for item in indexes.get('functions', {}))
+        return [node for node_id in ids if isinstance((node := by_id.get(node_id)), FunctionDef)]
     visitor = _FunctionCollector()
     visitor.visit(tree)
     return visitor.result
@@ -135,10 +143,18 @@ def _find_nodes_directly_in_function(
 
 
 def find_returns(func: FunctionDef) -> list[ast.Return]:
+    indexes = getattr(func, 'detyping_indexes', None)
+    by_id = getattr(func, 'detyping_node_index', None)
+    if indexes is not None and by_id is not None:
+        return [node for node_id in indexes.get('returns_by_function', {}).get(str(func.detyping_id), []) if isinstance((node := by_id.get(int(node_id))), ast.Return)]
     return [node for node in _find_nodes_directly_in_function(func, ast.Return) if isinstance(node, ast.Return)]
 
 
 def find_ann_assigns(func: FunctionDef) -> list[ast.AnnAssign]:
+    indexes = getattr(func, 'detyping_indexes', None)
+    by_id = getattr(func, 'detyping_node_index', None)
+    if indexes is not None and by_id is not None:
+        return [node for node_id in indexes.get('ann_assigns_by_function', {}).get(str(func.detyping_id), []) if isinstance((node := by_id.get(int(node_id))), ast.AnnAssign)]
     return [node for node in _find_nodes_directly_in_function(func, ast.AnnAssign) if isinstance(node, ast.AnnAssign)]
 
 
@@ -181,6 +197,17 @@ def find_name_uses_after(
 ) -> list[ast.Name]:
     """All Load uses of var_name in sibling statements after after_stmt."""
 
+    indexes = getattr(func, 'detyping_indexes', None)
+    by_id = getattr(func, 'detyping_node_index', None)
+    if indexes is not None and by_id is not None:
+        after = getattr(after_stmt, 'detyping_id', -1)
+        variables = indexes.get('variables', {})
+        candidates = []
+        for binding_id, binding in variables.get('bindings', {}).items():
+            if binding.get('scope_id') == func.detyping_id and binding.get('name') == var_name:
+                candidates.extend(variables.get('loads_by_binding', {}).get(str(binding_id), []))
+        return [node for node_id in candidates if int(node_id) > after and isinstance((node := by_id.get(int(node_id))), ast.Name)]
+
     results: list[ast.Name] = []
 
     class Visitor(ast.NodeVisitor):
@@ -206,6 +233,17 @@ def find_assigns_to_name_after(
     after_stmt: ast.stmt,
 ) -> list[ast.Assign]:
     """Plain assignments to var_name in sibling statements after after_stmt."""
+    indexes = getattr(func, 'detyping_indexes', None)
+    by_id = getattr(func, 'detyping_node_index', None)
+    if indexes is not None and by_id is not None:
+        after = getattr(after_stmt, 'detyping_id', -1)
+        result = []
+        for assign_id in indexes.get('assigns_by_function', {}).get(str(func.detyping_id), []):
+            assign = by_id.get(int(assign_id))
+            if int(assign_id) > after and isinstance(assign, ast.Assign) and any(isinstance(target, ast.Name) and target.id == var_name for target in assign.targets):
+                result.append(assign)
+        return result
+
     results: list[ast.Assign] = []
 
     class Visitor(ast.NodeVisitor):

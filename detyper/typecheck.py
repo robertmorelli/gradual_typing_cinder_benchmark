@@ -106,6 +106,34 @@ class _PyrightLsp:
             }
         })
 
+    def locations(self, method: str, uri: str, line: int, character: int) -> list[dict[str, Any]]:
+        result = self.request(method, {
+            'textDocument': {'uri': uri},
+            'position': {'line': line, 'character': character},
+        })
+        if not result:
+            return []
+        if isinstance(result, dict):
+            result = [result]
+        out = []
+        for item in result:
+            if not isinstance(item, dict):
+                continue
+            target_uri = item.get('targetUri') or item.get('uri')
+            rng = item.get('targetSelectionRange') or item.get('targetRange') or item.get('range')
+            if isinstance(target_uri, str) and isinstance(rng, dict):
+                out.append({'uri': target_uri, 'range': rng})
+        return out
+
+    def definition(self, uri: str, line: int, character: int) -> list[dict[str, Any]]:
+        return self.locations('textDocument/definition', uri, line, character)
+
+    def type_definition(self, uri: str, line: int, character: int) -> list[dict[str, Any]]:
+        return self.locations('textDocument/typeDefinition', uri, line, character)
+
+    def references(self, uri: str, line: int, character: int) -> list[dict[str, Any]]:
+        return self.locations('textDocument/references', uri, line, character)
+
     def hover(self, uri: str, line: int, character: int) -> str | None:
         result = self.request('textDocument/hover', {
             'textDocument': {'uri': uri},
@@ -130,6 +158,18 @@ class _PyrightLsp:
         return None
 
 
+def _query_position(node: ast.AST) -> tuple[int, int]:
+    line = getattr(node, 'lineno', 1) - 1
+    col = getattr(node, 'col_offset', 0)
+    if isinstance(node, ast.Attribute):
+        # AST col_offset for ``a.b`` points at ``a``.  Pyright hover/definition at
+        # that position describes the receiver.  Query the attribute token.
+        end_col = getattr(node, 'end_col_offset', None)
+        if end_col is not None:
+            col = max(col, end_col - len(node.attr))
+    return line, col
+
+
 def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'module.py') -> ast.AST:
     """Attach best-effort ``pyright_type`` attributes to expression nodes.
 
@@ -137,9 +177,15 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
     still gets ``pyright_type = None`` so downstream code has a stable shape.
     """
     exprs = [node for node in ast.walk(tree) if isinstance(node, ast.expr)]
+    symbol_nodes = [node for node in exprs if isinstance(node, (ast.Name, ast.Attribute, ast.Call))]
     for node in exprs:
         setattr(node, 'pyright_type', None)
+    for node in symbol_nodes:
+        setattr(node, 'pyright_definitions', [])
+        setattr(node, 'pyright_type_definitions', [])
+        setattr(node, 'pyright_references', [])
     setattr(tree, 'pyright_types', {})
+    setattr(tree, 'pyright_symbol_locations', {})
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
@@ -151,12 +197,29 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
                 lsp.initialize()
                 lsp.open_file(uri, source)
                 type_map: dict[tuple[int, int], str] = {}
+                symbol_map: dict[tuple[int, int], dict[str, Any]] = {}
                 for node in exprs:
-                    typ = lsp.hover(uri, node.lineno - 1, node.col_offset)
+                    line, char = _query_position(node)
+                    typ = lsp.hover(uri, line, char)
                     if typ:
                         setattr(node, 'pyright_type', typ)
                         type_map[(node.lineno, node.col_offset)] = typ
+                for node in symbol_nodes:
+                    line, char = _query_position(node)
+                    defs = lsp.definition(uri, line, char)
+                    type_defs = lsp.type_definition(uri, line, char)
+                    refs = lsp.references(uri, line, char)
+                    setattr(node, 'pyright_definitions', defs)
+                    setattr(node, 'pyright_type_definitions', type_defs)
+                    setattr(node, 'pyright_references', refs)
+                    if defs or type_defs or refs:
+                        symbol_map[(node.lineno, node.col_offset)] = {
+                            'definitions': defs,
+                            'type_definitions': type_defs,
+                            'references': refs,
+                        }
                 setattr(tree, 'pyright_types', type_map)
+                setattr(tree, 'pyright_symbol_locations', symbol_map)
             finally:
                 lsp.close()
     except Exception:

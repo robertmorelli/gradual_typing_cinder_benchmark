@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import ast
 from ast import FunctionDef, Module
 
+from .ast_utils import node_index
 from .rules import expand_aliases, resolve_annotation
 
 TypeSpec = ast.expr
@@ -117,32 +118,29 @@ def _collect_type_aliases(module: Module) -> dict[str, TypeSpec]:
     return {name: expand_aliases(typ, aliases) or typ for name, typ in aliases.items()}
 
 
+def _indexes(module: Module) -> dict:
+    indexes = getattr(module, 'detyping_indexes', None)
+    if indexes is None:
+        raise ValueError('PlanData requires staged AstData indexes')
+    return indexes
+
+
 def _collect_func_classes(module: Module) -> dict[int, str]:
-    result: dict[int, str] = {}
-    for stmt in module.body:
-        if isinstance(stmt, ast.ClassDef):
-            for item in stmt.body:
-                if isinstance(item, ast.FunctionDef):
-                    result[item.detyping_id] = stmt.name
-    return result
+    return {int(key): value for key, value in _indexes(module).get('func_classes', {}).items()}
 
 
 def _collect_class_init_params(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, list[TypeSpec | None]]:
     result: dict[str, list[TypeSpec | None]] = {}
-    classes = [stmt for stmt in module.body if isinstance(stmt, ast.ClassDef)]
-    bases: dict[str, str] = {}
-    for stmt in classes:
-        for base in stmt.bases:
-            if isinstance(base, ast.Name):
-                bases[stmt.name] = base.id
-                break
-        for item in stmt.body:
-            if isinstance(item, ast.FunctionDef) and item.name == '__init__':
-                result[stmt.name] = [
-                    expand_aliases(resolve_annotation(arg.annotation), aliases)
-                    for arg in item.args.args[1:]
-                ]
-                break
+    indexes = _indexes(module)
+    by_id = node_index(module)
+    for cls, arg_ids in indexes.get('class_init_param_annotation_ids', {}).items():
+        result[cls] = [
+            expand_aliases(resolve_annotation(by_id[arg_id].annotation), aliases)
+            if arg_id is not None and arg_id in by_id and isinstance(by_id[arg_id], ast.arg)
+            else None
+            for arg_id in arg_ids
+        ]
+    bases = dict(indexes.get('class_bases', {}))
     changed = True
     while changed:
         changed = False
@@ -155,26 +153,20 @@ def _collect_class_init_params(module: Module, aliases: dict[str, TypeSpec]) -> 
 
 def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[str, dict[str, TypeSpec]]:
     fields: dict[str, dict[str, TypeSpec]] = {}
-    bases: dict[str, str] = {}
-    for stmt in module.body:
-        if not isinstance(stmt, ast.ClassDef):
-            continue
-        for base in stmt.bases:
-            if isinstance(base, ast.Name):
-                bases[stmt.name] = base.id
-                break
+    indexes = _indexes(module)
+    by_id = node_index(module)
+    bases = dict(indexes.get('class_bases', {}))
+    for cls_data in indexes.get('classes', {}).values():
+        fields.setdefault(cls_data['name'], {})
+    for cls, ann_by_field in indexes.get('class_field_annotations', {}).items():
         cls_fields: dict[str, TypeSpec] = {}
-        for node in ast.walk(stmt):
-            if (
-                isinstance(node, ast.AnnAssign)
-                and isinstance(node.target, ast.Attribute)
-                and isinstance(node.target.value, ast.Name)
-                and node.target.value.id == 'self'
-            ):
-                typ = expand_aliases(resolve_annotation(node.annotation), aliases)
+        for field, ann_id in ann_by_field.items():
+            ann = by_id.get(int(ann_id))
+            if isinstance(ann, ast.AnnAssign):
+                typ = expand_aliases(resolve_annotation(ann.annotation), aliases)
                 if typ is not None:
-                    cls_fields[node.target.attr] = typ
-        fields[stmt.name] = cls_fields
+                    cls_fields[field] = typ
+        fields[cls] = cls_fields
     changed = True
     while changed:
         changed = False
@@ -190,16 +182,10 @@ def _collect_class_fields(module: Module, aliases: dict[str, TypeSpec]) -> dict[
 
 
 def _function_annotation_ids(fdef: FunctionDef) -> set[int]:
-    ids: set[int] = set()
-    for arg in fdef.args.args:
-        if arg.annotation is not None:
-            ids.add(arg.detyping_id)
-    if fdef.returns is not None:
-        ids.add(fdef.detyping_id)
-    for node in ast.walk(fdef):
-        if isinstance(node, ast.AnnAssign) and node.annotation is not None:
-            ids.add(node.detyping_id)
-    return ids
+    indexes = getattr(fdef, 'detyping_indexes', None)
+    if indexes is None:
+        raise ValueError('Function annotation metadata requires staged AstData indexes')
+    return set(indexes.get('function_annotation_ids', {}).get(str(fdef.detyping_id), []))
 
 
 def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
@@ -214,13 +200,8 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
     class_fields = _collect_class_fields(module, aliases)
     class_init_params = _collect_class_init_params(module, aliases)
     func_classes = _collect_func_classes(module)
-    class_bases: dict[str, str] = {}
-    for stmt in module.body:
-        if isinstance(stmt, ast.ClassDef):
-            for base in stmt.bases:
-                if isinstance(base, ast.Name):
-                    class_bases[stmt.name] = base.id
-                    break
+    indexes = _indexes(module)
+    class_bases: dict[str, str] = dict(indexes.get('class_bases', {}))
     guide_selected_ids = {key for key, value in guide.items() if isinstance(key, int) and value}
     if guide_selected_ids:
         expanded_selected_ids = set(guide_selected_ids)
@@ -234,7 +215,10 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
             }
             if not selected_arg_names:
                 continue
-            for node in ast.walk(fdef):
+            candidate_ids = indexes.get('ann_assigns_by_function', {}).get(str(fdef.detyping_id), [])
+            by_id = node_index(module)
+            for ann_id in candidate_ids:
+                node = by_id.get(int(ann_id))
                 if (
                     isinstance(node, ast.AnnAssign)
                     and node.annotation is not None
@@ -261,7 +245,10 @@ def build_plan_data(module: Module, defs: list, guide: dict) -> PlanData:
                         typ = expand_aliases(resolve_annotation(arg.annotation), aliases)
                         if typ is not None:
                             selected_constructor_param_types[(owner_class, idx)] = typ
-            for node in ast.walk(fdef):
+            candidate_ids = indexes.get('ann_assigns_by_function', {}).get(str(fdef.detyping_id), [])
+            by_id = node_index(module)
+            for ann_id in candidate_ids:
+                node = by_id.get(int(ann_id))
                 if (
                     isinstance(node, ast.AnnAssign)
                     and node.detyping_id in guide_selected_ids

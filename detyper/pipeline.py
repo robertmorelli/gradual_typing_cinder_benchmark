@@ -6,11 +6,12 @@ import ast
 import json
 from ast import Module
 from dataclasses import dataclass
-from functools import reduce
 from pathlib import Path
 
 from .annotation_sites import annotation_selection_closure, annotation_sites_from_tree
-from .ast_utils import all_function_defs, all_function_uses, all_method_uses, label_tree, node_index
+from .ast_data import AstData, ast_from_data, build_ast_data, read_ast_data, write_ast_data as write_ast_data_json
+from .bundle_builder import build_detyper_map_from_ast_data as build_policy_detyper_map_from_ast_data
+from .ast_utils import all_function_defs, node_index
 from .generators import (
     generate_tasks_body,
     generate_tasks_constructor_calls,
@@ -21,8 +22,8 @@ from .generators import (
     generate_tasks_return_definition,
 )
 from .plan_data import build_plan_data
-from .tasks import Detyper, intent_from_json, intent_to_json
-from .typecheck import decorate_ast_with_pyright
+from .intent_types import intent_from_json, intent_to_json
+from .intent_unifiers import IntentSet
 
 Permutation = tuple[bool, ...]
 GuideType = dict[str, bool]
@@ -370,8 +371,37 @@ def _inject_static_imports(module: Module) -> None:
     module.body.insert(insert_idx, new_import)
 
 
-def _collect_detypers(module: Module, defs: list, plan, func_uses, method_uses) -> list[Detyper]:
-    all_detypers: list[Detyper] = []
+def _call_uses_from_ast_data(module: Module, ast_data: AstData) -> tuple[list[tuple[ast.Call, ast.FunctionDef]], list[tuple[ast.Call, ast.FunctionDef]]]:
+    """Build call-use tuples from stage-1 indexes instead of walking the tree."""
+    by_id = node_index(module)
+    funcs_by_id = {f.detyping_id: f for f in all_function_defs(module)}
+    enclosing = ast_data.indexes.get('enclosing_function_by_node', {})
+
+    def _pairs(grouped: dict) -> list[tuple[ast.Call, ast.FunctionDef]]:
+        result: list[tuple[ast.Call, ast.FunctionDef]] = []
+        for ids in grouped.values():
+            for call_id in ids:
+                call = by_id.get(int(call_id))
+                func_id = enclosing.get(str(call_id))
+                caller = funcs_by_id.get(func_id) if func_id is not None else None
+                if isinstance(call, ast.Call) and caller is not None:
+                    result.append((call, caller))
+        return result
+
+    return (
+        _pairs(ast_data.indexes.get('calls_by_name', {})),
+        _pairs(ast_data.indexes.get('method_calls_by_attr', {})),
+    )
+
+
+def _defs_from_ast_data(module: Module, ast_data: AstData) -> list[ast.FunctionDef]:
+    by_id = node_index(module)
+    ids = sorted((int(item) for item in ast_data.indexes.get('functions', {}).keys()))
+    return [node for item in ids if isinstance((node := by_id.get(item)), ast.FunctionDef)]
+
+
+def _collect_detypers(module: Module, defs: list, plan, func_uses, method_uses) -> list[IntentSet]:
+    all_detypers: list[IntentSet] = []
     all_detypers += generate_tasks_global_annotations(module, plan)
     all_detypers += generate_tasks_constructor_calls(module, plan)
     for fdef in defs:
@@ -383,36 +413,20 @@ def _collect_detypers(module: Module, defs: list, plan, func_uses, method_uses) 
     return all_detypers
 
 
+def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str] | None = None) -> dict:
+    """Stage 2: build per-annotation bundles from stage-1 metadata/policy table."""
+    return build_policy_detyper_map_from_ast_data(ast_data, annotation_ids)
+
+
 def build_detyper_map(source: str, annotation_ids: list[str] | None = None) -> dict:
     """Build serializable per-annotation edit bundles keyed by annotation id."""
-    tree = ast.parse(source)
-    label_tree(tree)
-    decorate_ast_with_pyright(tree, source)
-    defs = all_function_defs(tree)
-    plan_names = {f.name for f in defs}
-    func_uses = all_function_uses(tree, plan_names)
-    method_uses = all_method_uses(tree, plan_names)
-    base_plan = build_plan_data(tree, defs, {})
-    sites = annotation_sites_from_tree(tree, base_plan.aliases)
-    if annotation_ids is None:
-        annotation_ids = [str(site.id) for site in sites]
-    annotation_closure = annotation_selection_closure(sites)
-
-    bundles = {}
-    for annotation_id in annotation_ids:
-        selected = annotation_closure.get(int(annotation_id), {int(annotation_id)})
-        guide = {item: True for item in selected}
-        plan = build_plan_data(tree, defs, guide)
-        detyper = reduce(lambda left, right: left + right, _collect_detypers(tree, defs, plan, func_uses, method_uses), Detyper())
-        bundles[annotation_id] = [intent_to_json(intent) for intent in detyper.intentions()]
-    return {'version': 1, 'annotation_ids': annotation_ids, 'bundles': bundles}
+    return build_detyper_map_from_ast_data(build_ast_data(source), annotation_ids)
 
 
-def build_detyped_program_from_map(source: str, detyper_map: dict, perm: Permutation) -> DetypedProgram:
-    tree = ast.parse(source)
-    label_tree(tree)
+def build_detyped_program_from_ast_data(ast_data: AstData, detyper_map: dict, perm: Permutation) -> DetypedProgram:
+    tree = ast_from_data(ast_data)
     selected_ids = [annotation_id for annotation_id, bit in zip(detyper_map['annotation_ids'], perm) if bit]
-    detyper = Detyper()
+    detyper = IntentSet()
     for annotation_id in selected_ids:
         for intent_data in detyper_map['bundles'][annotation_id]:
             detyper.add(intent_from_json(intent_data))
@@ -421,6 +435,82 @@ def build_detyped_program_from_map(source: str, detyper_map: dict, perm: Permuta
     _inject_static_imports(tree)
     ast.fix_missing_locations(tree)
     return DetypedProgram(perm=perm, perm_hex=perm_name(perm), source=ast.unparse(tree))
+
+
+def build_detyped_program_from_map(source: str, detyper_map: dict, perm: Permutation) -> DetypedProgram:
+    return build_detyped_program_from_ast_data(build_ast_data(source), detyper_map, perm)
+
+
+def write_ast_data(source: str, output_path: Path) -> Path:
+    """Stage 1: write complete AST JSON plus indexes. Later stages need no source."""
+    return write_ast_data_json(source, output_path)
+
+
+def _type_json(expr: ast.expr | None):
+    if expr is None:
+        return None
+    return {'src': ast.unparse(expr), 'dump': ast.dump(expr)}
+
+
+def plan_data_to_json(plan: PlanData) -> dict:
+    """Serialize PlanData metadata for inspection/staged pipelines."""
+    return {
+        'version': 1,
+        'funcs': {
+            name: {
+                'fun_name': info.fun_name,
+                'param_types': [_type_json(item) for item in info.param_types],
+                'return_type': _type_json(info.return_type),
+                'is_detyped': info.is_detyped,
+            }
+            for name, info in plan.funcs.items()
+        },
+        'aliases': {name: _type_json(typ) for name, typ in plan.aliases.items()},
+        'class_fields': {
+            cls: {field: _type_json(typ) for field, typ in fields.items()}
+            for cls, fields in plan.class_fields.items()
+        },
+        'class_init_params': {
+            cls: [_type_json(typ) for typ in params]
+            for cls, params in plan.class_init_params.items()
+        },
+        'func_classes': {str(key): value for key, value in plan.func_classes.items()},
+        'selected_annotation_ids': sorted(plan.selected_annotation_ids) if plan.selected_annotation_ids is not None else None,
+        'selected_field_types': {
+            f'{cls}.{field}': _type_json(typ)
+            for (cls, field), typ in (plan.selected_field_types or {}).items()
+        },
+        'selected_constructor_param_types': {
+            f'{cls}.{idx}': _type_json(typ)
+            for (cls, idx), typ in (plan.selected_constructor_param_types or {}).items()
+        },
+        'class_bases': plan.class_bases or {},
+    }
+
+
+def write_plan_data_from_ast_data(ast_data_path: Path, output_path: Path, guide: dict | None = None) -> Path:
+    """Stage 2 metadata: write PlanData JSON using only ast_data.json."""
+    ast_data = read_ast_data(ast_data_path)
+    tree = ast_from_data(ast_data)
+    plan = build_plan_data(tree, _defs_from_ast_data(tree, ast_data), guide or {})
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(plan_data_to_json(plan), indent=2), encoding='utf-8')
+    return output_path
+
+
+def write_detyper_map_from_ast_data(ast_data_path: Path, output_path: Path, annotation_ids: list[str] | None = None) -> Path:
+    """Stage 2: write edit bundles using only ast_data.json."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(build_detyper_map_from_ast_data(read_ast_data(ast_data_path), annotation_ids), indent=2), encoding='utf-8')
+    return output_path
+
+
+def write_detyped_program_from_ast_data(ast_data_path: Path, detyper_map_path: Path, output_path: Path, perm: Permutation) -> Path:
+    """Stage 3: apply a detyper map using only JSON artifacts and emit source."""
+    program = build_detyped_program_from_ast_data(read_ast_data(ast_data_path), read_detyper_map(detyper_map_path), perm)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(program.source, encoding='utf-8')
+    return output_path
 
 
 def write_detyper_map(source: str, output_path: Path, annotation_ids: list[str] | None = None) -> Path:
@@ -439,15 +529,12 @@ def build_detyped_program(
     fun_names: list[str],
 ) -> DetypedProgram:
     """Apply the pure detyping transform for one permutation."""
-    tree = ast.parse(source)
-    label_tree(tree)
-    decorate_ast_with_pyright(tree, source)
+    ast_data = build_ast_data(source)
+    tree = ast_from_data(ast_data)
     module = tree
 
-    defs = all_function_defs(tree)
-    plan_names = {f.name for f in defs}
-    func_uses = all_function_uses(tree, plan_names)
-    method_uses = all_method_uses(tree, plan_names)
+    defs = _defs_from_ast_data(tree, ast_data)
+    func_uses, method_uses = _call_uses_from_ast_data(tree, ast_data)
 
     guide: GuideType | dict[int, bool]
     if all(name.isdigit() for name in fun_names):
@@ -456,7 +543,9 @@ def build_detyped_program(
         guide = dict(zip(fun_names, perm))
     plan = build_plan_data(module, defs, guide)
 
-    detyper = reduce(lambda left, right: left + right, _collect_detypers(module, defs, plan, func_uses, method_uses), Detyper())
+    detyper = IntentSet()
+    for piece in _collect_detypers(module, defs, plan, func_uses, method_uses):
+        detyper.merge(piece)
     detyper.execute(node_index(tree))
 
     _post_process(module)
