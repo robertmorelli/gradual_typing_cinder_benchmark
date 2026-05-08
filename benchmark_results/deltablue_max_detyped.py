@@ -77,7 +77,7 @@ class Constraint(object):
         overridden = cast(Constraint | None, out.determined_by)
         if overridden is not None:
             overridden.mark_unsatisfied()
-        out.determined_by = cast(Constraint | None, self)
+        out.determined_by = self
         if not cbool(planner.add_propagate(self, box(int64(mark)))):
             print('Cycle encountered')
         out.mark = box(int64(int64(mark)))
@@ -133,7 +133,7 @@ class UrnaryConstraint(Constraint):
         return cast(Variable, self.my_output)
 
     def recalculate(self):
-        cast(Variable, self.my_output).walk_strength = cast(Strength, cast(Strength, self.strength))
+        cast(Variable, self.my_output).walk_strength = cast(Strength, self.strength)
         cast(Variable, self.my_output).stay = box(cbool(not cbool(self.is_input())))
         if cbool(cast(Variable, self.my_output).stay):
             self.execute()
@@ -214,7 +214,7 @@ class BinaryConstraint(Constraint):
     def recalculate(self):
         ihn = cast(Variable, self.input())
         out = cast(Variable, self.output())
-        out.walk_strength = cast(Strength, cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength))))
+        out.walk_strength = cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength)))
         out.stay = box(cbool(cbool(ihn.stay)))
         if cbool(out.stay):
             self.execute()
@@ -268,7 +268,7 @@ class ScaleConstraint(BinaryConstraint):
     def recalculate(self):
         ihn = cast(Variable, self.input())
         out = cast(Variable, self.output())
-        out.walk_strength = cast(Strength, cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength))))
+        out.walk_strength = cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength)))
         out.stay = box(cbool(cbool(ihn.stay) and cbool(cast(Variable, self.scale).stay) and cbool(cast(Variable, self.offset).stay)))
         if cbool(out.stay):
             self.execute()
@@ -297,7 +297,7 @@ class Variable(object):
     def remove_constraint(self, constraint):
         self.constraints.remove(cast(Constraint, constraint))
         if cast(Constraint | None, self.determined_by) == cast(Constraint, constraint):
-            self.determined_by = cast(Constraint | None, None)
+            self.determined_by = None
 
 @final
 class Planner(object):
@@ -364,8 +364,8 @@ class Planner(object):
         return box(cbool(True))
 
     def remove_propagate_from(self, out):
-        cast(Variable, out).determined_by = cast(Constraint | None, None)
-        cast(Variable, out).walk_strength = cast(Strength, WEAKEST)
+        cast(Variable, out).determined_by = None
+        cast(Variable, out).walk_strength = WEAKEST
         cast(Variable, out).stay = box(cbool(True))
         unsatisfied = CheckedList[Constraint]([])
         todo = CheckedList[Variable]([])

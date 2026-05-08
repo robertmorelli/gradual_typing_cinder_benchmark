@@ -17,9 +17,11 @@ TypeKind = Literal[
     'cinder_checked_container',
     'cinder_static_container',
     'python_scalar',
+    'python_tuple',
     'python_container',
     'python_user_object',
     'int_enum',
+    'iterator',
     'none_only',
     'optional',
     'union',
@@ -65,6 +67,7 @@ DEFAULT_RULES: tuple[TypeRule, ...] = (
     TypeRule('optional', prefixes=('Optional[',), contains=(' | None', 'None |')),
     TypeRule('union', prefixes=('Union[',), contains=(' | ',)),
     TypeRule('callable', prefixes=('Callable[',), regexes=(r'^\(.*\)\s*->\s*.+$',)),
+    TypeRule('iterator', exact=frozenset({'Iterator', 'Generator'}), prefixes=('Iterator[', 'Generator[', 'Iterable[',)), 
     TypeRule('cinder_scalar', exact=frozenset({
         'int64', 'int32', 'int16', 'int8',
         'uint64', 'uint32', 'uint16', 'uint8',
@@ -73,9 +76,10 @@ DEFAULT_RULES: tuple[TypeRule, ...] = (
     TypeRule('cinder_checked_container', exact=frozenset({'CheckedList', 'CheckedDict'}), prefixes=('CheckedList[', 'CheckedDict[')),
     TypeRule('cinder_static_container', exact=frozenset({'Array', 'Vector'}), prefixes=('Array[', 'Vector[')),
     TypeRule('python_scalar', exact=frozenset({'int', 'float', 'bool', 'str', 'bytes'})),
-    TypeRule('python_container', exact=frozenset({'list', 'dict', 'set', 'tuple', 'List', 'Dict', 'Set', 'Tuple'}), prefixes=(
-        'list[', 'dict[', 'set[', 'tuple[',
-        'List[', 'Dict[', 'Set[', 'Tuple[',
+    TypeRule('python_tuple', exact=frozenset({'tuple', 'Tuple'}), prefixes=('tuple[', 'Tuple[')),
+    TypeRule('python_container', exact=frozenset({'list', 'dict', 'set', 'List', 'Dict', 'Set'}), prefixes=(
+        'list[', 'dict[', 'set[',
+        'List[', 'Dict[', 'Set[',
     )),
 )
 

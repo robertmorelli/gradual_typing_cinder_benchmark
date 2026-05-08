@@ -25,7 +25,7 @@ def _type_expr(src: str | None) -> ast.expr | None:
 
 
 def _wrap_args(action: Action, typ: ast.expr | None) -> list[Arg]:
-    if action == Action.WRAP_RUNTIME_TYPE:
+    if action in (Action.WRAP_RUNTIME_TYPE, Action.WRAP_NONNULL_RUNTIME_TYPE):
         return [Arg(None, typ, wrap_order=0)]
     if action == Action.WRAP_BOX:
         return [Arg(None, None, wrap_order=1)]
@@ -98,6 +98,9 @@ def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[a
     field_read_ids = tree.detyping_indexes.get('field_reads_by_annotation', {}).get(str(annotation.detyping_id), [])
     if field_read_ids:
         places[Place.FIELD_READS] = [tree.detyping_node_index[int(node_id)] for node_id in field_read_ids]
+    receiver_ids = tree.detyping_indexes.get('attribute_receivers_by_annotation', {}).get(str(annotation.detyping_id), [])
+    if receiver_ids:
+        places[Place.ATTRIBUTE_RECEIVERS] = [tree.detyping_node_index[int(node_id)] for node_id in receiver_ids]
     override_ids = tree.detyping_indexes.get('override_family_annotations_by_annotation', {}).get(str(annotation.detyping_id), [])
     if override_ids:
         places[Place.OVERRIDE_FAMILY_ANNOTATION_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in override_ids]
@@ -157,7 +160,8 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
                     if action == Action.REWRITE_PARAM_BINDING and isinstance(node, ast.arg) and isinstance(context, ast.FunctionDef):
                         detyper.add(make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name))
                         continue
-                    if wrap_args := _wrap_args(action, typ):
+                    action_typ = _type_expr(rec.get('resolved_type_src')) if action == Action.WRAP_NONNULL_RUNTIME_TYPE else typ
+                    if wrap_args := _wrap_args(action, action_typ):
                         target_context = _annotation_context(target, tree)
                         detyper.add(make_wrap_intent(target, target_context, wrap_args, _func_name(target_context)))
 

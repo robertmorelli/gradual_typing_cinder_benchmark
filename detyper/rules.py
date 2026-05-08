@@ -92,7 +92,7 @@ PRIMITIVE_NAMES = frozenset({
 
 # Container passthrough types (generic, treated with cast, but NOT CheckedList).
 CONTAINER_NAMES = frozenset({
-    'Array', 'Vector',
+    'Array', 'Vector', 'List', 'Dict', 'Set', 'list', 'dict', 'set',
 })
 
 # Generic types that cannot be cast at runtime (generators, iterators, etc.)
@@ -181,10 +181,10 @@ def classify_type(typ: ast.expr | None, aliases: dict[str, ast.expr] | None = No
         if isinstance(val, ast.Name):
             if val.id == 'CheckedList':
                 return 'checked_list'
-            if val.id in BUILTIN_NAMES or val.id in TYPING_BUILTIN_NAMES:
-                return 'builtin'
             if val.id in CONTAINER_NAMES:
                 return 'container'
+            if val.id in BUILTIN_NAMES or val.id in TYPING_BUILTIN_NAMES:
+                return 'builtin'
             if val.id in UNCASTABLE_NAMES:
                 return 'none'
         return 'cast'

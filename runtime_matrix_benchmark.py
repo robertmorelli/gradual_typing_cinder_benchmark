@@ -17,7 +17,7 @@ SAMPLES_PER_CELL = 3
 SEED = 1729
 ALL_KINDS = [
     'cinder_scalar', 'cinder_checked_container', 'cinder_static_container',
-    'python_scalar', 'python_container', 'python_user_object', 'int_enum',
+    'python_scalar', 'python_tuple', 'python_container', 'python_user_object', 'int_enum', 'iterator',
     'none_only', 'optional', 'union', 'callable', 'type_alias', 'dynamic_unknown',
 ]
 

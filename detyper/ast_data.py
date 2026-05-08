@@ -355,7 +355,9 @@ def _clean_pyright_type(raw: str | None) -> str | None:
     for prefix in ('(variable)', '(parameter)', '(function)', '(method)', '(class)', 'type:'):
         if text.startswith(prefix):
             text = text[len(prefix):].strip()
-    if ':' in text and not text.startswith(('list[', 'dict[', 'tuple[', 'Optional[', 'Union[')):
+    if text.startswith('(type)') and '=' in text:
+        text = text.split('=', 1)[1].strip()
+    if ':' in text and not text.startswith(('list[', 'dict[', 'tuple[', 'Tuple[', 'Optional[', 'Union[')):
         text = text.rsplit(':', 1)[-1].strip()
     if ' -> ' in text and text.startswith('('):
         return text
@@ -385,7 +387,7 @@ def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None, in
 def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
-    if pyright_resolved in {'Unknown', 'Any'}:
+    if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type['):
         pyright_resolved = None
     resolved = pyright_resolved or (aliases or {}).get(annotation_src or '') or annotation_src
     type_meta = classification_metadata(resolved, aliases=set((aliases or {}).keys()), int_enums=int_enums)
@@ -446,6 +448,9 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                     kind = 'method_self_parameter_annotation' if idx == 0 and arg.arg == 'self' else 'method_parameter_annotation'
                 else:
                     kind = 'function_parameter_annotation'
+                ann_src = _name_of_type(arg.annotation)
+                if kind in {'function_parameter_annotation', 'method_parameter_annotation', 'constructor_parameter_annotation'} and ann_src and ('| None' in ann_src or 'None |' in ann_src or ann_src.startswith(('Optional[', 'Union['))):
+                    kind = f'{kind}_with_optional'
                 rec = _annotation_record(arg, kind=kind, annotation=arg.annotation, function_id=func_id, class_id=info['class_id'], name=arg.arg, param_index=idx, aliases=aliases, int_enums=int_enum_names)
                 annotations[str(arg.detyping_id)] = rec
                 annotations_by_function.setdefault(str(func_id), []).append(arg.detyping_id)
@@ -468,19 +473,20 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             is_field = isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == 'self'
             target_name = node.target.attr if isinstance(node.target, ast.Attribute) else node.target.id if isinstance(node.target, ast.Name) else None
             has_value = node.value is not None
+            value_shape = 'with_none' if isinstance(node.value, ast.Constant) and node.value.value is None else 'with_value' if has_value else 'no_value'
             if is_field:
                 prefix = 'init_instance_variable' if func_name == '__init__' else 'non_init_instance_variable'
-                kind = f'{prefix}_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'{prefix}_annotation_{value_shape}'
             elif func_id is None and class_id is None:
-                kind = f'module_global_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'module_global_annotation_{value_shape}'
             elif func_id is None and class_id is not None:
-                kind = f'class_attribute_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'class_attribute_annotation_{value_shape}'
             elif class_id is None:
-                kind = f'function_local_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'function_local_annotation_{value_shape}'
             elif func_name == '__init__':
-                kind = f'constructor_local_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'constructor_local_annotation_{value_shape}'
             else:
-                kind = f'method_local_annotation_{"with_value" if has_value else "no_value"}'
+                kind = f'method_local_annotation_{value_shape}'
             rec = _annotation_record(node, kind=kind, annotation=node.annotation, function_id=func_id, class_id=class_id, name=target_name, aliases=aliases, int_enums=int_enum_names)
             annotations[str(node.detyping_id)] = rec
             if func_id is not None:
@@ -555,9 +561,15 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         value_type = _clean_pyright_type(getattr(value_node, 'pyright_type', None)) if value_node is not None else None
         value_class = None
         if value_type:
-            value_class = value_type.split('|', 1)[0].strip().split('[', 1)[0].split('.')[-1]
-            if value_class.startswith('Self@'):
-                value_class = value_class.split('@', 1)[1]
+            type_options = [part.strip() for part in value_type.split('|')]
+            value_class = None
+            for option in type_options:
+                candidate = option.split('[', 1)[0].split('.')[-1]
+                if candidate.startswith('Self@'):
+                    candidate = candidate.split('@', 1)[1]
+                if candidate and candidate not in {'Unknown', 'None', 'NoneType'}:
+                    value_class = candidate
+                    break
         precise: list[str] = []
         cursor = value_class
         while cursor:
@@ -640,11 +652,16 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     reassign_rhs_by_annotation: dict[str, list[int]] = {}
     for ann_id, ann_rec in annotations.items():
         ann_node = by_id[int(ann_id)]
-        if not (isinstance(ann_node, ast.AnnAssign) and isinstance(ann_node.target, ast.Name)):
+        binding_node_id = None
+        if isinstance(ann_node, ast.AnnAssign) and isinstance(ann_node.target, ast.Name):
+            binding_node_id = ann_node.target.detyping_id
+        elif isinstance(ann_node, ast.arg):
+            binding_node_id = ann_node.detyping_id
+        if binding_node_id is None:
             continue
         binding_id = None
         for bid, binding in base.variables['bindings'].items():
-            if binding.get('node_id') == ann_node.target.detyping_id:
+            if binding.get('node_id') == binding_node_id:
                 binding_id = bid
                 break
         if binding_id is None:
@@ -737,6 +754,52 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             if binding.get('node_id') == binding_node_id:
                 binding_annotation_by_binding[str(bid)] = int(ann_id)
                 break
+
+    # Propagate annotation ownership through simple local aliases like
+    # `p = maybe_packet`; later `p.link` should be governed by the annotation
+    # policy for `maybe_packet`.
+    for node in by_id.values():
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and isinstance(node.value, ast.Name)):
+            continue
+        rhs_use = base.variables['uses'].get(str(node.value.detyping_id), {})
+        rhs_binding = rhs_use.get('binding_id')
+        rhs_ann = binding_annotation_by_binding.get(str(rhs_binding)) if rhs_binding is not None else None
+        if rhs_ann is None:
+            continue
+        for bid, binding in base.variables['bindings'].items():
+            if binding.get('node_id') == node.targets[0].detyping_id:
+                binding_annotation_by_binding.setdefault(str(bid), rhs_ann)
+                break
+
+    attribute_receiver_uses: dict[str, dict[str, Any]] = {}
+    attribute_receivers_by_annotation: dict[str, list[int]] = {}
+    for attr_id, attr_rec in attributes.items():
+        attr = by_id[int(attr_id)]
+        if not isinstance(attr, ast.Attribute):
+            continue
+        receiver = attr.value
+        ann_id = None
+        if isinstance(receiver, ast.Name):
+            use = base.variables['uses'].get(str(receiver.detyping_id), {})
+            binding_id = use.get('binding_id')
+            ann_id = binding_annotation_by_binding.get(str(binding_id)) if binding_id is not None else None
+        if ann_id is None:
+            continue
+        ann_rec = annotations.get(str(ann_id), {})
+        attribute_receivers_by_annotation.setdefault(str(ann_id), []).append(receiver.detyping_id)
+        attribute_receiver_uses[str(receiver.detyping_id)] = {
+            'id': receiver.detyping_id,
+            'attribute_id': attr.detyping_id,
+            'attribute_attr': attr.attr,
+            'attribute_ctx': type(attr.ctx).__name__.lower(),
+            'receiver_annotation_id': ann_id,
+            'receiver_context': ann_rec.get('context'),
+            'receiver_type_kind': ann_rec.get('type_kind'),
+            'receiver_type_src': ann_rec.get('resolved_type_src'),
+            **_expr_type_metadata(receiver, aliases, int_enum_names),
+        }
+    for ids in attribute_receivers_by_annotation.values():
+        ids[:] = sorted(set(ids))
 
     call_arg_uses: dict[str, dict[str, Any]] = {}
     call_args_by_param_annotation: dict[str, list[int]] = {}
@@ -905,6 +968,8 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'field_reassign_rhs_by_annotation': field_reassign_rhs_by_annotation,
         'field_read_uses': field_read_uses,
         'field_reads_by_annotation': field_reads_by_annotation,
+        'attribute_receiver_uses': attribute_receiver_uses,
+        'attribute_receivers_by_annotation': attribute_receivers_by_annotation,
         'override_family_annotations_by_annotation': override_family_annotations_by_annotation,
         'annotation_sync_groups': annotation_sync_groups,
         'call_result_uses': call_result_uses,

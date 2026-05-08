@@ -82,7 +82,8 @@ def _apply_rewrite_param_binding(intent: Intent, nodes: dict[int, AST]) -> None:
         orig_name = param.arg
         kind = classify_type(typ)
 
-        if kind == 'checked_list':
+        is_static_container = isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'Array', 'Vector'}
+        if kind == 'checked_list' or is_static_container:
             param.annotation = None
             stmt: ast.stmt = ast.Assign(
                 targets=[ast.Name(id=orig_name, ctx=ast.Store())],
