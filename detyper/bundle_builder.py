@@ -121,6 +121,9 @@ def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[a
     call_arg_ids = tree.detyping_indexes.get('call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
     if call_arg_ids:
         places[Place.CALL_ARG_TO_DETYPED_PARAM] = [tree.detyping_node_index[int(node_id)] for node_id in call_arg_ids]
+    literal_call_arg_ids = tree.detyping_indexes.get('literal_call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
+    if literal_call_arg_ids:
+        places[Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM] = [tree.detyping_node_index[int(node_id)] for node_id in literal_call_arg_ids]
     call_args_by_kind = tree.detyping_indexes.get('call_args_by_param_annotation_and_arg_kind', {}).get(str(annotation.detyping_id), {})
     scalar_arg_ids = call_args_by_kind.get('cinder_scalar', [])
     if scalar_arg_ids:

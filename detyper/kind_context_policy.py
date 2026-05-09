@@ -21,6 +21,7 @@ class Place(StrEnum):
     FUNCTION_CALL_SITES = 'function_call_sites'
     METHOD_CALL_SITES = 'method_call_sites'
     CALL_ARG_TO_DETYPED_PARAM = 'call_arg_to_detyped_param'
+    LITERAL_CALL_ARG_TO_DETYPED_PARAM = 'literal_call_arg_to_detyped_param'
     CALL_ARG_TO_TYPED_PARAM = 'call_arg_to_typed_param'
     CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR = 'call_arg_to_detyped_param_from_cinder_scalar'
     CALL_ARG_TO_DETYPED_PARAM_FROM_PYTHON_OBJECT = 'call_arg_to_detyped_param_from_python_object'
@@ -68,6 +69,8 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -99,6 +102,8 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -128,6 +133,8 @@ POLICY: PolicyTable = {
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -147,6 +154,10 @@ POLICY: PolicyTable = {
             Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
             Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
         }},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+        }},
         'cinder_static_container': {'dynamic_any': {
             Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
             Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
@@ -155,6 +166,7 @@ POLICY: PolicyTable = {
         'python_tuple': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
             Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
         }},
         'optional': {'dynamic_any': {}},
@@ -171,7 +183,10 @@ POLICY: PolicyTable = {
             Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
-        'cinder_checked_container': {'dynamic_any': {}},
+        'cinder_checked_container': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+        }},
         'cinder_static_container': {'dynamic_any': {
             Place.FIELD_READS: ('wrap_runtime_type',),
         }},
@@ -179,6 +194,7 @@ POLICY: PolicyTable = {
         'python_tuple': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
             Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
             Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
@@ -418,6 +434,8 @@ for _context in ['function_parameter_annotation_with_optional', 'method_paramete
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),

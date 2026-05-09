@@ -9,8 +9,24 @@ from .intent_types import Arg, Intent
 from .rules import classify_type
 
 
+def _stringify_typing_container_args(typ: ast.expr) -> ast.expr:
+    if not (isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'List', 'Dict', 'Set', 'Mapping', 'Optional', 'Union', 'list', 'dict', 'set'}):
+        return typ
+
+    class _StringifyNames(ast.NodeTransformer):
+        def visit_Name(self, node: ast.Name) -> ast.AST:
+            if node.id in {'int', 'float', 'bool', 'str', 'bytes', 'None'}:
+                return node
+            return ast.copy_location(ast.Constant(value=node.id), node)
+
+    new_typ = ast.copy_location(ast.fix_missing_locations(ast.parse(ast.unparse(typ), mode='eval').body), typ)
+    new_typ.slice = _StringifyNames().visit(new_typ.slice)  # type: ignore[assignment]
+    return ast.fix_missing_locations(new_typ)
+
+
 def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
     kind = classify_type(typ)
+    typ = _stringify_typing_container_args(typ)
     if kind == 'primitive':
         type_name = typ.id if isinstance(typ, ast.Name) else ast.unparse(typ)
         return ast.Call(func=ast.Name(id=type_name, ctx=ast.Load()), args=[expr], keywords=[])

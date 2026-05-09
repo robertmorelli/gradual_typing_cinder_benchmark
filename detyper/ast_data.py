@@ -803,6 +803,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
 
     call_arg_uses: dict[str, dict[str, Any]] = {}
     call_args_by_param_annotation: dict[str, list[int]] = {}
+    literal_call_args_by_param_annotation: dict[str, list[int]] = {}
 
     def _arg_binding_metadata(arg_node: ast.AST) -> dict[str, Any]:
         if not isinstance(arg_node, ast.Name):
@@ -840,6 +841,8 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         }
         call_arg_uses[str(arg_id)] = rec
         call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
+        if isinstance(by_id[arg_id], (ast.List, ast.ListComp)):
+            literal_call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
 
     for call_id, use_rec in function_uses.items():
         call_rec = calls[str(call_id)]
@@ -961,6 +964,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'calls_by_function': calls_by_function,
         'call_arg_uses': call_arg_uses,
         'call_args_by_param_annotation': call_args_by_param_annotation,
+        'literal_call_args_by_param_annotation': literal_call_args_by_param_annotation,
         'call_args_by_param_annotation_and_arg_kind': call_args_by_param_annotation_and_arg_kind,
         'reassign_rhs_uses': reassign_rhs_uses,
         'reassign_rhs_by_annotation': reassign_rhs_by_annotation,
