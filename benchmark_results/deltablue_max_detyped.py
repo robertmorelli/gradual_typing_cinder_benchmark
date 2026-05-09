@@ -35,7 +35,7 @@ def weaker(s1, s2):
 
 @inline
 def weakest_of(s1, s2):
-    return cast(Strength, s1) if int64(cast(Strength, s1).strength) > int64(cast(Strength, s2).strength) else cast(Strength, s2)
+    return cast(Strength, cast(Strength, s1) if int64(cast(Strength, s1).strength) > int64(cast(Strength, s2).strength) else cast(Strength, s2))
 
 @final
 class Strength:
@@ -45,7 +45,7 @@ class Strength:
         self.name = name
 
     def next_weaker(self):
-        return CheckedList[Strength](STRENGTHS)[int64(self.strength)]
+        return cast(Strength, STRENGTHS[int64(self.strength)])
 REQUIRED = Strength(box(int64(0)), 'required')
 STRONG_PREFERRED = Strength(box(int64(1)), 'strongPreferred')
 PREFERRED = Strength(box(int64(2)), 'preferred')
@@ -53,7 +53,7 @@ STRONG_DEFAULT = Strength(box(int64(3)), 'strongDefault')
 NORMAL = Strength(box(int64(4)), 'normal')
 WEAK_DEFAULT = Strength(box(int64(5)), 'weakDefault')
 WEAKEST = Strength(box(int64(6)), 'weakest')
-STRENGTHS = CheckedList[Strength](CheckedList[Strength]([WEAKEST, WEAK_DEFAULT, NORMAL, STRONG_DEFAULT, PREFERRED, REQUIRED]))
+STRENGTHS = CheckedList[Strength]([WEAKEST, WEAK_DEFAULT, NORMAL, STRONG_DEFAULT, PREFERRED, REQUIRED])
 
 class Constraint(object):
 
@@ -68,10 +68,10 @@ class Constraint(object):
     def satisfy(self, mark):
         planner = cast(Planner, get_planner())
         self.choose_method(box(int64(mark)))
-        if not cbool(self.is_satisfied()):
+        if not self.is_satisfied():
             if cast(Strength, self.strength) == REQUIRED:
                 print('Could not satisfy a required constraint!')
-            return None
+            return cast(Constraint | None, None)
         self.mark_inputs(box(int64(mark)))
         out = cast(Variable, self.output())
         overridden = cast(Constraint | None, out.determined_by)
@@ -81,11 +81,11 @@ class Constraint(object):
         if not cbool(planner.add_propagate(self, box(int64(mark)))):
             print('Cycle encountered')
         out.mark = box(int64(int64(mark)))
-        return overridden
+        return cast(Constraint | None, overridden)
 
     def destroy_constraint(self):
         planner = cast(Planner, get_planner())
-        if cbool(self.is_satisfied()):
+        if self.is_satisfied():
             planner.incremental_remove(self)
         else:
             self.remove_from_graph()
@@ -130,7 +130,7 @@ class UrnaryConstraint(Constraint):
         return box(cbool(cbool(self.satisfied)))
 
     def output(self):
-        return cast(Variable, self.my_output)
+        return cast(Variable, cast(Variable, self.my_output))
 
     def recalculate(self):
         cast(Variable, self.my_output).walk_strength = cast(Strength, self.strength)
@@ -206,10 +206,10 @@ class BinaryConstraint(Constraint):
         cast(Variable, self.input()).mark = box(int64(int64(mark)))
 
     def input(self):
-        return cast(Variable, self.v1) if self.direction == Direction.FORWARD else cast(Variable, self.v2)
+        return cast(Variable, cast(Variable, self.v1) if self.direction == Direction.FORWARD else cast(Variable, self.v2))
 
     def output(self):
-        return cast(Variable, self.v2) if self.direction == Direction.FORWARD else cast(Variable, self.v1)
+        return cast(Variable, cast(Variable, self.v2) if self.direction == Direction.FORWARD else cast(Variable, self.v1))
 
     def recalculate(self):
         ihn = cast(Variable, self.input())
@@ -307,9 +307,9 @@ class Planner(object):
 
     def incremental_add(self, constraint):
         mark = int64(self.new_mark())
-        overridden = cast(Constraint | None, cast(Constraint, constraint).satisfy(box(int64(mark))))
+        overridden = cast(Constraint, constraint).satisfy(box(int64(mark)))
         while overridden is not None:
-            overridden = cast(Constraint | None, overridden.satisfy(box(int64(mark))))
+            overridden = overridden.satisfy(box(int64(mark)))
 
     def incremental_remove(self, constraint):
         out = cast(Variable, cast(Constraint, constraint).output())
@@ -320,7 +320,7 @@ class Planner(object):
         repeat = True
         while repeat:
             for u in unsatisfied:
-                if u.strength == strength:
+                if cast(Strength, u.strength) == strength:
                     self.incremental_add(u)
                 strength = cast(Strength, strength.next_weaker())
             repeat = strength != WEAKEST
@@ -331,28 +331,26 @@ class Planner(object):
         return box(int64(int64(self.current_mark)))
 
     def make_plan(self, sources):
-        sources = cast(CheckedList[UrnaryConstraint], sources)
         mark = int64(self.new_mark())
         plan = Plan()
-        todo = CheckedList[Constraint]([s for s in sources])
+        todo = [s for s in sources]
         while clen(todo):
             c = todo.pop(0)
             if int64(cast(Variable, c.output()).mark) != mark and cbool(c.inputs_known(box(int64(mark)))):
                 plan.add_constraint(c)
                 cast(Variable, c.output()).mark = box(int64(mark))
                 self.add_constraints_consuming_to(cast(Variable, c.output()), todo)
-        return plan
+        return cast(Plan, plan)
 
     def extract_plan_from_constraints(self, constraints):
-        constraints = cast(CheckedList[UrnaryConstraint], constraints)
-        sources = CheckedList[UrnaryConstraint]([])
+        sources = []
         for c in constraints:
             if cbool(c.is_input()) and cbool(c.is_satisfied()):
                 sources.append(c)
-        return cast(Plan, self.make_plan(sources))
+        return cast(Plan, cast(Plan, self.make_plan(sources)))
 
     def add_propagate(self, c, mark):
-        todo = CheckedList[Constraint]([])
+        todo = []
         todo.append(cast(Constraint, c))
         while clen(todo):
             d = todo.pop(0)
@@ -367,28 +365,27 @@ class Planner(object):
         cast(Variable, out).determined_by = None
         cast(Variable, out).walk_strength = WEAKEST
         cast(Variable, out).stay = box(cbool(True))
-        unsatisfied = CheckedList[Constraint]([])
-        todo = CheckedList[Variable]([])
+        unsatisfied = []
+        todo = []
         todo.append(cast(Variable, out))
         while len(todo):
             v = todo.pop(0)
             cs = v.constraints
             for c in cs:
-                if not cbool(c.is_satisfied()):
+                if not c.is_satisfied():
                     unsatisfied.append(c)
             determining = cast(Constraint | None, v.determined_by)
             for c in cs:
-                if c != determining and cbool(c.is_satisfied()):
+                if c != determining and c.is_satisfied():
                     c.recalculate()
                     todo.append(cast(Variable, c.output()))
         return unsatisfied
 
     def add_constraints_consuming_to(self, v, coll):
-        coll = cast(CheckedList[Constraint], coll)
         determining = cast(Constraint | None, cast(Variable, v).determined_by)
         cc = cast(Variable, v).constraints
         for c in cc:
-            if c != determining and cbool(c.is_satisfied()):
+            if c != determining and c.is_satisfied():
                 coll.append(c)
 
 @final
@@ -413,11 +410,11 @@ class Plan(object):
 def recreate_planner():
     global planner
     planner = Planner()
-    return planner
+    return cast(Planner, planner)
 
 def get_planner():
     global planner
-    return planner
+    return cast(Planner, planner)
 
 def chain_test(n):
     """
@@ -454,7 +451,7 @@ def chain_test(n):
     last = cast(Variable, last)
     StayConstraint(last, STRONG_DEFAULT)
     edit = EditConstraint(first, PREFERRED)
-    edits = CheckedList[UrnaryConstraint]([])
+    edits = []
     edits.append(edit)
     plan = cast(Plan, planner.extract_plan_from_constraints(edits))
     i = box(int64(0))
@@ -476,7 +473,7 @@ def projection_test(n):
     scale = Variable('scale', box(int64(10)))
     offset = Variable('offset', box(int64(1000)))
     src = None
-    dests = CheckedList[Variable]([])
+    dests = []
     i = box(int64(0))
     dst = Variable('dst%s' % 0, box(int64(0)))
     while int64(i) < int64(n):
@@ -497,20 +494,20 @@ def projection_test(n):
     change(scale, box(int64(5)))
     i = box(int64(0))
     while int64(i) < int64(n) - 1:
-        if int64(dests[int64(i)].value) != int64(i) * 5 + 1000:
+        if dests[int64(i)].value != int64(i) * 5 + 1000:
             print('Projection 3 failed')
         i = box(int64(int64(i) + 1))
     change(offset, box(int64(2000)))
     i = box(int64(0))
     while int64(i) < int64(n) - 1:
-        if int64(dests[int64(i)].value) != int64(i) * 5 + 2000:
+        if dests[int64(i)].value != int64(i) * 5 + 2000:
             print('Projection 4 failed')
         i = box(int64(int64(i) + 1))
 
 def change(v, new_value):
     planner = cast(Planner, get_planner())
     edit = EditConstraint(cast(Variable, v), PREFERRED)
-    edits = CheckedList[UrnaryConstraint]([])
+    edits = []
     edits.append(edit)
     plan = cast(Plan, planner.extract_plan_from_constraints(edits))
     i = box(int64(0))

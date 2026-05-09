@@ -10,7 +10,7 @@ from .rules import classify_type
 
 
 def _stringify_typing_container_args(typ: ast.expr) -> ast.expr:
-    if not (isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'List', 'Dict', 'Set', 'Mapping', 'Optional', 'Union', 'list', 'dict', 'set'}):
+    if not (isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'List', 'Dict', 'Set', 'Mapping', 'list', 'dict', 'set'}):
         return typ
 
     class _StringifyNames(ast.NodeTransformer):

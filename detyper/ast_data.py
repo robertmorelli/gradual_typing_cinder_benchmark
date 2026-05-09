@@ -56,7 +56,7 @@ class AstIndex:
         return self.nodes(ids)
 
     def calls_named(self, name: str) -> list[ast.Call]:
-        ids = self.indexes.get('calls_by_name', {}).get(name, []) + self.indexes.get('method_calls_by_attr', {}).get(name, [])
+        ids = [int(node_id) for node_id, rec in self.indexes.get('calls', {}).items() if rec.get('name') == name]
         return [node for node in self.nodes(ids) if isinstance(node, ast.Call)]
 
     def symbol_defs(self, use_id: int) -> list[ast.AST]:
@@ -102,8 +102,6 @@ class _IndexBuilder(ast.NodeVisitor):
     def __init__(self):
         self.functions: dict[str, dict[str, Any]] = {}
         self.classes: dict[str, dict[str, Any]] = {}
-        self.calls_by_name: dict[str, list[int]] = {}
-        self.method_calls_by_attr: dict[str, list[int]] = {}
         self.ann_assigns_by_function: dict[str, list[int]] = {}
         self.returns_by_function: dict[str, list[int]] = {}
         self.assigns_by_function: dict[str, list[int]] = {}
@@ -297,10 +295,6 @@ class _IndexBuilder(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         self._record_common(node)
-        if isinstance(node.func, ast.Name):
-            self.calls_by_name.setdefault(node.func.id, []).append(node.detyping_id)
-        elif isinstance(node.func, ast.Attribute):
-            self.method_calls_by_attr.setdefault(node.func.attr, []).append(node.detyping_id)
         ast.NodeVisitor.generic_visit(self, node)
 
     def visit_Name(self, node: ast.Name) -> None:
@@ -389,6 +383,8 @@ def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, functi
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
     if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type[') or ' is equivalent to ' in (pyright_resolved or '') or 'There is no runtime checking' in (pyright_resolved or ''):
         pyright_resolved = None
+    if kind in {'function_return_annotation', 'method_return_annotation'} and annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
+        pyright_resolved = None
     resolved = pyright_resolved or (aliases or {}).get(annotation_src or '') or annotation_src
     type_meta = classification_metadata(resolved, aliases=set((aliases or {}).keys()), int_enums=int_enums)
     return {
@@ -413,11 +409,23 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     children_by_node = {str(node_id): [child.detyping_id for child in ast.iter_child_nodes(node)] for node_id, node in by_id.items()}
     subtree_by_node = {str(node_id): [child.detyping_id for child in ast.walk(node) if hasattr(child, 'detyping_id')] for node_id, node in by_id.items()}
 
-    functions_by_name: dict[str, list[int]] = {}
+    function_ids_by_name_line: dict[tuple[str, int], list[int]] = {}
     for raw_id, info in base.functions.items():
-        functions_by_name.setdefault(info['name'], []).append(int(raw_id))
+        fnode = by_id[int(raw_id)]
+        function_ids_by_name_line.setdefault((info['name'], getattr(fnode, 'lineno', -1)), []).append(int(raw_id))
+    class_ids_by_name_line: dict[tuple[str, int], int] = {
+        (info['name'], getattr(by_id[int(raw_id)], 'lineno', -1)): int(raw_id)
+        for raw_id, info in base.classes.items()
+    }
 
-    classes_by_name: dict[str, int] = {info['name']: int(raw_id) for raw_id, info in base.classes.items()}
+    def _definition_start_lines(node: ast.AST) -> list[int]:
+        lines: list[int] = []
+        for loc in getattr(node, 'pyright_definitions', None) or []:
+            start = loc.get('range', {}).get('start', {})
+            if start.get('line') is not None:
+                lines.append(int(start['line']) + 1)
+        return sorted(set(lines))
+
     int_enum_names = {
         info['name'] for info in base.classes.values()
         if 'IntEnum' in info.get('base_names', []) or 'enum.IntEnum' in info.get('base_names', [])
@@ -504,7 +512,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 calls_by_function.setdefault(str(func_id), []).append(node.detyping_id)
 
     attributes: dict[str, dict[str, Any]] = {}
-    self_fields_by_name: dict[str, list[int]] = {}
     for node in by_id.values():
         if isinstance(node, ast.Attribute):
             rec = {
@@ -518,8 +525,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 'span': _span(node),
             }
             attributes[str(node.detyping_id)] = rec
-            if rec['is_self_attr']:
-                self_fields_by_name.setdefault(node.attr, []).append(node.detyping_id)
 
     nodes_by_function_kind: dict[str, dict[str, list[int]]] = {}
     for raw_node_id, func_id in base.enclosing_function_by_node.items():
@@ -530,20 +535,23 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
 
     function_uses: dict[str, dict[str, Any]] = {}
     function_uses_by_def: dict[str, list[int]] = {}
-    method_uses_by_name: dict[str, list[int]] = {}
     method_uses_by_def: dict[str, list[int]] = {}
     for call_id, call_rec in calls.items():
         name = call_rec.get('name')
         if not name:
             continue
+        call_node = by_id[int(call_id)]
+        func_node = by_id.get(int(call_rec.get('func_id'))) if call_rec.get('func_id') is not None else None
+        def_ids: list[int] = []
+        if func_node is not None:
+            for line in _definition_start_lines(func_node):
+                def_ids.extend(function_ids_by_name_line.get((name, line), []))
+        def_ids = sorted(set(def_ids))
         if call_rec.get('kind') == 'name':
-            def_ids = functions_by_name.get(name, [])
             function_uses[call_id] = {**call_rec, 'definition_ids': def_ids}
             for def_id in def_ids:
                 function_uses_by_def.setdefault(str(def_id), []).append(int(call_id))
         elif call_rec.get('kind') == 'attribute':
-            def_ids = functions_by_name.get(name, [])
-            method_uses_by_name.setdefault(name, []).append(int(call_id))
             function_uses[call_id] = {**call_rec, 'definition_ids': def_ids}
             for def_id in def_ids:
                 method_uses_by_def.setdefault(str(def_id), []).append(int(call_id))
@@ -551,36 +559,22 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     field_definitions: dict[str, dict[str, Any]] = {}
     field_uses: dict[str, dict[str, Any]] = {}
     field_uses_by_field: dict[str, list[int]] = {}
+    field_annotation_ids_by_name_line: dict[tuple[str, int], list[int]] = {}
     for cls, fields in base.class_field_annotations.items():
         for field, ann_id in fields.items():
             key = f'{cls}.{field}'
+            ann_node = by_id[int(ann_id)]
             field_definitions[key] = {'class_name': cls, 'field_name': field, 'annotation_id': ann_id}
+            field_annotation_ids_by_name_line.setdefault((field, getattr(ann_node, 'lineno', -1)), []).append(int(ann_id))
+    annotation_to_field_keys = {str(info['annotation_id']): key for key, info in field_definitions.items()}
     for attr_id, attr_rec in attributes.items():
+        attr_node = by_id[int(attr_id)]
         field = attr_rec['attr']
-        value_node = by_id.get(int(attr_rec['value_id']))
-        value_type = _clean_pyright_type(getattr(value_node, 'pyright_type', None)) if value_node is not None else None
-        value_class = None
-        if value_type:
-            type_options = [part.strip() for part in value_type.split('|')]
-            value_class = None
-            for option in type_options:
-                candidate = option.split('[', 1)[0].split('.')[-1]
-                if candidate.startswith('Self@'):
-                    candidate = candidate.split('@', 1)[1]
-                if candidate and candidate not in {'Unknown', 'None', 'NoneType'}:
-                    value_class = candidate
-                    break
-        precise: list[str] = []
-        cursor = value_class
-        while cursor:
-            key = f'{cursor}.{field}'
-            if key in field_definitions:
-                precise = [key]
-                break
-            cursor = base.class_bases.get(cursor)
-        fallback = [key for key, info in field_definitions.items() if info['field_name'] == field]
-        matches = precise or (fallback if len(fallback) == 1 else [])
-        field_uses[attr_id] = {**attr_rec, 'field_keys': matches, 'receiver_type_src': value_type, 'receiver_class': value_class}
+        matched_ann_ids: list[int] = []
+        for line in _definition_start_lines(attr_node):
+            matched_ann_ids.extend(field_annotation_ids_by_name_line.get((field, line), []))
+        matches = sorted({annotation_to_field_keys[str(ann_id)] for ann_id in matched_ann_ids if str(ann_id) in annotation_to_field_keys})
+        field_uses[attr_id] = {**attr_rec, 'field_keys': matches, 'field_resolution': 'pyright'}
         for key in matches:
             field_uses_by_field.setdefault(key, []).append(int(attr_id))
 
@@ -638,6 +632,44 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     for uses in symbol_links['def_to_uses'].values():
         uses.sort()
 
+    annotation_binding_node_by_annotation: dict[str, int] = {}
+    annotation_by_binding_node: dict[str, int] = {}
+    for ann_id, ann_rec in annotations.items():
+        ann_node = by_id[int(ann_id)]
+        binding_node_id = None
+        if isinstance(ann_node, ast.arg):
+            binding_node_id = ann_node.detyping_id
+        elif isinstance(ann_node, ast.AnnAssign) and isinstance(ann_node.target, ast.Name):
+            binding_node_id = ann_node.target.detyping_id
+        if binding_node_id is not None:
+            annotation_binding_node_by_annotation[str(ann_id)] = binding_node_id
+            annotation_by_binding_node[str(binding_node_id)] = int(ann_id)
+
+    name_reads_by_annotation: dict[str, list[int]] = {}
+    name_writes_by_annotation: dict[str, list[int]] = {}
+    for ann_id, binding_node_id in annotation_binding_node_by_annotation.items():
+        ref_ids = set(symbol_links['use_to_refs'].get(str(binding_node_id), []))
+        ref_ids.update(symbol_links['def_to_uses'].get(str(binding_node_id), []))
+        ref_ids.discard(int(binding_node_id))
+        for ref_id in sorted(ref_ids):
+            ref_node = by_id.get(int(ref_id))
+            if isinstance(ref_node, ast.Name):
+                if isinstance(ref_node.ctx, ast.Load):
+                    name_reads_by_annotation.setdefault(ann_id, []).append(ref_id)
+                elif isinstance(ref_node.ctx, (ast.Store, ast.Del)):
+                    name_writes_by_annotation.setdefault(ann_id, []).append(ref_id)
+    for ids in name_reads_by_annotation.values():
+        ids[:] = sorted(set(ids))
+    for ids in name_writes_by_annotation.values():
+        ids[:] = sorted(set(ids))
+
+    def _annotation_id_for_name_use(name: ast.Name) -> int | None:
+        for def_id in symbol_links['use_to_defs'].get(str(name.detyping_id), []):
+            ann_id = annotation_by_binding_node.get(str(def_id))
+            if ann_id is not None:
+                return ann_id
+        return None
+
     def _param_annotation_id(function_id: int, param_index: int) -> int | None:
         func = base.functions.get(str(function_id))
         if not func:
@@ -651,23 +683,8 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     reassign_rhs_uses: dict[str, dict[str, Any]] = {}
     reassign_rhs_by_annotation: dict[str, list[int]] = {}
     for ann_id, ann_rec in annotations.items():
-        ann_node = by_id[int(ann_id)]
-        binding_node_id = None
-        if isinstance(ann_node, ast.AnnAssign) and isinstance(ann_node.target, ast.Name):
-            binding_node_id = ann_node.target.detyping_id
-        elif isinstance(ann_node, ast.arg):
-            binding_node_id = ann_node.detyping_id
-        if binding_node_id is None:
-            continue
-        binding_id = None
-        for bid, binding in base.variables['bindings'].items():
-            if binding.get('node_id') == binding_node_id:
-                binding_id = bid
-                break
-        if binding_id is None:
-            continue
         rhs_ids: list[int] = []
-        for store_id in base.variables['stores_by_binding'].get(str(binding_id), []):
+        for store_id in name_writes_by_annotation.get(str(ann_id), []):
             store_node = by_id[int(store_id)]
             parent_ids = [pid for pid, child_ids in children_by_node.items() if int(store_id) in child_ids]
             for parent_id in parent_ids:
@@ -740,37 +757,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     for ids in field_reads_by_annotation.values():
         ids.sort()
 
-    binding_annotation_by_binding: dict[str, int] = {}
-    for ann_id, ann_rec in annotations.items():
-        ann_node = by_id[int(ann_id)]
-        binding_node_id = None
-        if isinstance(ann_node, ast.arg):
-            binding_node_id = ann_node.detyping_id
-        elif isinstance(ann_node, ast.AnnAssign) and isinstance(ann_node.target, ast.Name):
-            binding_node_id = ann_node.target.detyping_id
-        if binding_node_id is None:
-            continue
-        for bid, binding in base.variables['bindings'].items():
-            if binding.get('node_id') == binding_node_id:
-                binding_annotation_by_binding[str(bid)] = int(ann_id)
-                break
-
-    # Propagate annotation ownership through simple local aliases like
-    # `p = maybe_packet`; later `p.link` should be governed by the annotation
-    # policy for `maybe_packet`.
-    for node in by_id.values():
-        if not (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and isinstance(node.value, ast.Name)):
-            continue
-        rhs_use = base.variables['uses'].get(str(node.value.detyping_id), {})
-        rhs_binding = rhs_use.get('binding_id')
-        rhs_ann = binding_annotation_by_binding.get(str(rhs_binding)) if rhs_binding is not None else None
-        if rhs_ann is None:
-            continue
-        for bid, binding in base.variables['bindings'].items():
-            if binding.get('node_id') == node.targets[0].detyping_id:
-                binding_annotation_by_binding.setdefault(str(bid), rhs_ann)
-                break
-
     attribute_receiver_uses: dict[str, dict[str, Any]] = {}
     attribute_receivers_by_annotation: dict[str, list[int]] = {}
     for attr_id, attr_rec in attributes.items():
@@ -780,9 +766,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         receiver = attr.value
         ann_id = None
         if isinstance(receiver, ast.Name):
-            use = base.variables['uses'].get(str(receiver.detyping_id), {})
-            binding_id = use.get('binding_id')
-            ann_id = binding_annotation_by_binding.get(str(binding_id)) if binding_id is not None else None
+            ann_id = _annotation_id_for_name_use(receiver)
         if ann_id is None:
             continue
         ann_rec = annotations.get(str(ann_id), {})
@@ -801,6 +785,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     for ids in attribute_receivers_by_annotation.values():
         ids[:] = sorted(set(ids))
 
+
     call_arg_uses: dict[str, dict[str, Any]] = {}
     call_args_by_param_annotation: dict[str, list[int]] = {}
     literal_call_args_by_param_annotation: dict[str, list[int]] = {}
@@ -808,14 +793,9 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     def _arg_binding_metadata(arg_node: ast.AST) -> dict[str, Any]:
         if not isinstance(arg_node, ast.Name):
             return {}
-        use = base.variables['uses'].get(str(arg_node.detyping_id), {})
-        binding_id = use.get('binding_id')
-        if binding_id is None:
-            return {}
-        ann_id = binding_annotation_by_binding.get(str(binding_id))
+        ann_id = _annotation_id_for_name_use(arg_node)
         ann_rec = annotations.get(str(ann_id), {}) if ann_id is not None else {}
         return {
-            'arg_binding_id': binding_id,
             'arg_binding_annotation_id': ann_id,
             'arg_binding_type_kind': ann_rec.get('type_kind'),
             'arg_binding_type_src': ann_rec.get('resolved_type_src'),
@@ -857,14 +837,21 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     for call_id, call_rec in calls.items():
         if call_rec.get('kind') != 'name':
             continue
-        class_id = classes_by_name.get(call_rec.get('name'))
-        if class_id is None:
+        call_node = by_id[int(call_id)]
+        func_node = by_id.get(int(call_rec.get('func_id'))) if call_rec.get('func_id') is not None else None
+        if func_node is None:
             continue
-        class_rec = base.classes.get(str(class_id), {})
-        init_ann_ids = base.class_init_param_annotation_ids.get(class_rec.get('name'), [])
-        for arg_index, ann_id in enumerate(init_ann_ids[:len(call_rec.get('arg_ids', []))]):
-            if str(ann_id) in annotations:
-                _record_call_arg(int(call_id), call_rec, arg_index, int(ann_id), 'call_arg_to_constructor_param')
+        class_ids: list[int] = []
+        for line in _definition_start_lines(func_node):
+            class_id = class_ids_by_name_line.get((call_rec.get('name'), line))
+            if class_id is not None:
+                class_ids.append(class_id)
+        for class_id in sorted(set(class_ids)):
+            class_rec = base.classes.get(str(class_id), {})
+            init_ann_ids = base.class_init_param_annotation_ids.get(class_rec.get('name'), [])
+            for arg_index, ann_id in enumerate(init_ann_ids[:len(call_rec.get('arg_ids', []))]):
+                if str(ann_id) in annotations:
+                    _record_call_arg(int(call_id), call_rec, arg_index, int(ann_id), 'call_arg_to_constructor_param')
 
     for call_id, use_rec in function_uses.items():
         call_rec = calls[str(call_id)]
@@ -872,20 +859,15 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             continue
         call_node = by_id[int(call_id)]
         assert isinstance(call_node, ast.Call)
-        is_unbound_class_call = (
-            isinstance(call_node.func, ast.Attribute)
-            and isinstance(call_node.func.value, ast.Name)
-            and call_node.func.value.id in classes_by_name
-        )
+        is_unbound_class_call = False
+        if isinstance(call_node.func, ast.Attribute) and isinstance(call_node.func.value, ast.Name):
+            for line in _definition_start_lines(call_node.func.value):
+                if class_ids_by_name_line.get((call_node.func.value.id, line)) is not None:
+                    is_unbound_class_call = True
+                    break
         param_offset = 0 if is_unbound_class_call else 1
         relation = 'call_arg_to_unbound_method_param' if is_unbound_class_call else 'call_arg_to_method_param'
-        receiver_class_name = call_node.func.value.id if is_unbound_class_call and isinstance(call_node.func, ast.Attribute) and isinstance(call_node.func.value, ast.Name) else None
         for def_id in use_rec.get('definition_ids', []):
-            if receiver_class_name is not None:
-                def_func = base.functions.get(str(def_id), {})
-                def_class = base.classes.get(str(def_func.get('class_id')), {})
-                if def_class.get('name') != receiver_class_name:
-                    continue
             for arg_index, _arg_id in enumerate(call_rec.get('arg_ids', [])):
                 ann_id = _param_annotation_id(int(def_id), arg_index + param_offset)
                 if ann_id is not None:
@@ -904,28 +886,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
 
     override_family_annotations_by_annotation: dict[str, list[int]] = {}
     annotation_sync_groups: dict[str, list[int]] = {}
-    functions_grouped: dict[tuple[str, int | None], list[int]] = {}
-    for raw_func_id, func in base.functions.items():
-        functions_grouped.setdefault((func['name'], len(func.get('arg_ids', []))), []).append(int(raw_func_id))
-    for _group, func_ids in functions_grouped.items():
-        if len(func_ids) < 2:
-            continue
-        return_ids = [base.functions[str(fid)].get('return_annotation_id') for fid in func_ids]
-        return_ids = [int(item) for item in return_ids if item is not None and str(item) in annotations]
-        for ann_id in return_ids:
-            override_family_annotations_by_annotation[str(ann_id)] = sorted(item for item in return_ids if item != ann_id)
-            annotation_sync_groups[str(ann_id)] = sorted(return_ids)
-        max_args = max(len(base.functions[str(fid)].get('arg_ids', [])) for fid in func_ids)
-        for index in range(max_args):
-            param_ann_ids: list[int] = []
-            for fid in func_ids:
-                ann_id = _param_annotation_id(fid, index)
-                if ann_id is not None:
-                    param_ann_ids.append(ann_id)
-            if len(param_ann_ids) > 1:
-                for ann_id in param_ann_ids:
-                    override_family_annotations_by_annotation[str(ann_id)] = sorted(item for item in param_ann_ids if item != ann_id)
-                    annotation_sync_groups[str(ann_id)] = sorted(param_ann_ids)
 
     call_result_uses: dict[str, dict[str, Any]] = {}
     call_results_by_return_annotation: dict[str, list[int]] = {}
@@ -951,18 +911,15 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'int_enum_names': sorted(int_enum_names),
         'alias_type_metadata': {alias: classification_metadata(target, aliases=set(aliases.keys()), int_enums=int_enum_names) for alias, target in aliases.items()},
         'functions': base.functions,
-        'functions_by_name': functions_by_name,
         'function_uses': function_uses,
         'function_uses_by_def': function_uses_by_def,
-        'method_uses_by_name': method_uses_by_name,
         'method_uses_by_def': method_uses_by_def,
         'classes': base.classes,
-        'classes_by_name': classes_by_name,
         'calls': calls,
-        'calls_by_name': base.calls_by_name,
-        'method_calls_by_attr': base.method_calls_by_attr,
         'calls_by_function': calls_by_function,
         'call_arg_uses': call_arg_uses,
+        'name_reads_by_annotation': name_reads_by_annotation,
+        'name_writes_by_annotation': name_writes_by_annotation,
         'call_args_by_param_annotation': call_args_by_param_annotation,
         'literal_call_args_by_param_annotation': literal_call_args_by_param_annotation,
         'call_args_by_param_annotation_and_arg_kind': call_args_by_param_annotation_and_arg_kind,
@@ -979,7 +936,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'call_result_uses': call_result_uses,
         'call_results_by_return_annotation': call_results_by_return_annotation,
         'attributes': attributes,
-        'self_fields_by_name': self_fields_by_name,
         'field_definitions': field_definitions,
         'field_uses': field_uses,
         'field_uses_by_field': field_uses_by_field,

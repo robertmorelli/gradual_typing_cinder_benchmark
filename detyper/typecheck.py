@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import ast
 import json
+import tokenize
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+
+from .analogous_types import analysis_source
 
 
 def _file_uri(path: Path) -> str:
@@ -177,7 +180,7 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
     still gets ``pyright_type = None`` so downstream code has a stable shape.
     """
     exprs = [node for node in ast.walk(tree) if isinstance(node, ast.expr)]
-    symbol_nodes = [node for node in exprs if isinstance(node, (ast.Name, ast.Attribute, ast.Call))]
+    symbol_nodes = [node for node in ast.walk(tree) if isinstance(node, (ast.Name, ast.Attribute, ast.Call, ast.arg))]
     for node in exprs:
         setattr(node, 'pyright_type', None)
     for node in symbol_nodes:
@@ -189,13 +192,16 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
+            pyright_source = analysis_source(source)
+            if len(pyright_source) != len(source) or pyright_source.count('\n') != source.count('\n'):
+                pyright_source = source
             path = Path(tmp) / filename
-            path.write_text(source, encoding='utf-8')
+            path.write_text(pyright_source, encoding='utf-8')
             uri = _file_uri(path)
             lsp = _PyrightLsp(Path(tmp))
             try:
                 lsp.initialize()
-                lsp.open_file(uri, source)
+                lsp.open_file(uri, pyright_source)
                 type_map: dict[tuple[int, int], str] = {}
                 symbol_map: dict[tuple[int, int], dict[str, Any]] = {}
                 for node in exprs:

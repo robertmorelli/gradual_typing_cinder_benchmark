@@ -20,12 +20,11 @@ class Place(StrEnum):
     FIELD_REASSIGN_RHS = 'field_reassign_rhs'
     FUNCTION_CALL_SITES = 'function_call_sites'
     METHOD_CALL_SITES = 'method_call_sites'
-    CALL_ARG_TO_DETYPED_PARAM = 'call_arg_to_detyped_param'
-    LITERAL_CALL_ARG_TO_DETYPED_PARAM = 'literal_call_arg_to_detyped_param'
-    CALL_ARG_TO_TYPED_PARAM = 'call_arg_to_typed_param'
-    CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR = 'call_arg_to_detyped_param_from_cinder_scalar'
-    CALL_ARG_TO_DETYPED_PARAM_FROM_PYTHON_OBJECT = 'call_arg_to_detyped_param_from_python_object'
-    CALL_RESULT_FROM_DETYPED_RETURN = 'call_result_from_detyped_return'
+    CALL_ARGS_TO_PARAMETER = 'call_args_to_parameter'
+    LITERAL_CALL_ARGS_TO_PARAMETER = 'literal_call_args_to_parameter'
+    CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR = 'call_args_to_parameter_from_cinder_scalar'
+    CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT = 'call_args_to_parameter_from_python_object'
+    CALL_RESULTS_FROM_RETURN = 'call_results_from_return'
     RETURN_VALUES = 'return_values'
     FIELD_READS = 'field_reads'
     ATTRIBUTE_RECEIVERS = 'attribute_receivers'
@@ -64,13 +63,13 @@ POLICY: PolicyTable = {
     'function_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
             Place.REASSIGN_RHS: ('wrap_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -97,13 +96,13 @@ POLICY: PolicyTable = {
     'method_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -113,7 +112,7 @@ POLICY: PolicyTable = {
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR: ('wrap_runtime_type_then_box',),
         }},
         'optional': {'dynamic_any': {}},
         'union': {'dynamic_any': {}},
@@ -128,13 +127,13 @@ POLICY: PolicyTable = {
     'constructor_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
             Place.REASSIGN_RHS: ('wrap_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -152,25 +151,31 @@ POLICY: PolicyTable = {
         'cinder_scalar': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
             Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_tuple': {'dynamic_any': {}},
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+        }},
+        'union': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+        }},
         'none_only': {'dynamic_any': {}},
         'iterator': {'dynamic_any': {}},
         'dynamic_unknown': {'dynamic_any': {}},
@@ -180,12 +185,12 @@ POLICY: PolicyTable = {
             Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
             Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
             Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.FIELD_READS: ('wrap_runtime_type',),
@@ -195,12 +200,20 @@ POLICY: PolicyTable = {
         'python_container': {'dynamic_any': {}},
         'python_user_object': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULT_FROM_DETYPED_RETURN: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
             Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
+        'optional': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
+        'union': {'dynamic_any': {
+            Place.RETURN_VALUES: ('wrap_runtime_type',),
+            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+        }},
         'none_only': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_box',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
@@ -430,12 +443,12 @@ for _context in ['function_parameter_annotation_with_optional', 'method_paramete
         'python_container': {'dynamic_any': {}},
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),

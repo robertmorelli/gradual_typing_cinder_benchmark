@@ -75,31 +75,12 @@ def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[a
         if method_call_ids:
             places[Place.METHOD_CALL_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in method_call_ids]
 
-    # Local read links for annotated names/params. Pyright links first, lexical fallback.
-    binding_id = None
-    if isinstance(annotation, ast.arg):
-        for bid, binding in tree.detyping_indexes.get('variables', {}).get('bindings', {}).items():
-            if binding.get('node_id') == annotation.detyping_id:
-                binding_id = bid
-                break
-    elif isinstance(annotation, ast.AnnAssign) and isinstance(annotation.target, ast.Name):
-        for bid, binding in tree.detyping_indexes.get('variables', {}).get('bindings', {}).items():
-            if binding.get('node_id') == annotation.target.detyping_id:
-                binding_id = bid
-                break
-    if binding_id is not None:
-        ids = tree.detyping_indexes.get('variables', {}).get('loads_by_binding', {}).get(str(binding_id), [])
-        places[Place.LOCAL_READS] = [tree.detyping_node_index[int(node_id)] for node_id in ids]
-
-    if isinstance(annotation, ast.AnnAssign) and isinstance(annotation.target, ast.Name) and rec.get('context', '').startswith('module_global_'):
-        global_reads: list[ast.AST] = []
-        for bid, binding in tree.detyping_indexes.get('globals', {}).get('bindings', {}).items():
-            if binding.get('node_id') == annotation.target.detyping_id:
-                ids = tree.detyping_indexes.get('globals', {}).get('uses_by_binding', {}).get(str(bid), [])
-                global_reads = [tree.detyping_node_index[int(node_id)] for node_id in ids]
-                break
-        if global_reads:
-            places[Place.MODULE_GLOBAL_READS] = global_reads
+    read_ids = tree.detyping_indexes.get('name_reads_by_annotation', {}).get(str(annotation.detyping_id), [])
+    if read_ids:
+        read_nodes = [tree.detyping_node_index[int(node_id)] for node_id in read_ids]
+        places[Place.LOCAL_READS] = read_nodes
+        if rec.get('context', '').startswith('module_global_'):
+            places[Place.MODULE_GLOBAL_READS] = read_nodes
 
     reassign_ids = tree.detyping_indexes.get('reassign_rhs_by_annotation', {}).get(str(annotation.detyping_id), [])
     if reassign_ids:
@@ -120,21 +101,21 @@ def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[a
 
     call_arg_ids = tree.detyping_indexes.get('call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
     if call_arg_ids:
-        places[Place.CALL_ARG_TO_DETYPED_PARAM] = [tree.detyping_node_index[int(node_id)] for node_id in call_arg_ids]
+        places[Place.CALL_ARGS_TO_PARAMETER] = [tree.detyping_node_index[int(node_id)] for node_id in call_arg_ids]
     literal_call_arg_ids = tree.detyping_indexes.get('literal_call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
     if literal_call_arg_ids:
-        places[Place.LITERAL_CALL_ARG_TO_DETYPED_PARAM] = [tree.detyping_node_index[int(node_id)] for node_id in literal_call_arg_ids]
+        places[Place.LITERAL_CALL_ARGS_TO_PARAMETER] = [tree.detyping_node_index[int(node_id)] for node_id in literal_call_arg_ids]
     call_args_by_kind = tree.detyping_indexes.get('call_args_by_param_annotation_and_arg_kind', {}).get(str(annotation.detyping_id), {})
     scalar_arg_ids = call_args_by_kind.get('cinder_scalar', [])
     if scalar_arg_ids:
-        places[Place.CALL_ARG_TO_DETYPED_PARAM_FROM_CINDER_SCALAR] = [tree.detyping_node_index[int(node_id)] for node_id in scalar_arg_ids]
+        places[Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR] = [tree.detyping_node_index[int(node_id)] for node_id in scalar_arg_ids]
     object_arg_ids = call_args_by_kind.get('python_user_object', [])
     if object_arg_ids:
-        places[Place.CALL_ARG_TO_DETYPED_PARAM_FROM_PYTHON_OBJECT] = [tree.detyping_node_index[int(node_id)] for node_id in object_arg_ids]
+        places[Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT] = [tree.detyping_node_index[int(node_id)] for node_id in object_arg_ids]
 
     call_result_ids = tree.detyping_indexes.get('call_results_by_return_annotation', {}).get(str(annotation.detyping_id), [])
     if call_result_ids:
-        places[Place.CALL_RESULT_FROM_DETYPED_RETURN] = [tree.detyping_node_index[int(node_id)] for node_id in call_result_ids]
+        places[Place.CALL_RESULTS_FROM_RETURN] = [tree.detyping_node_index[int(node_id)] for node_id in call_result_ids]
     return places
 
 
