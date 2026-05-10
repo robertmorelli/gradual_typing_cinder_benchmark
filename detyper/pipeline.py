@@ -342,7 +342,7 @@ def _sanitize_static_shapes(module: Module) -> None:
 
 
 def _inject_static_imports(module: Module) -> None:
-    """Import cast/box from __static__ if the transformed module now needs them."""
+    """Import generated __static__ helpers if the transformed module now needs them."""
     already: set[str] = set()
     for stmt in module.body:
         if isinstance(stmt, ast.ImportFrom) and stmt.module == '__static__':
@@ -351,7 +351,7 @@ def _inject_static_imports(module: Module) -> None:
 
     needed: set[str] = set()
     for node in ast.walk(module):
-        if isinstance(node, ast.Name) and node.id in ('cast', 'box') and node.id not in already:
+        if isinstance(node, ast.Name) and node.id in ('cast', 'box', 'int64') and node.id not in already:
             needed.add(node.id)
 
     if not needed:

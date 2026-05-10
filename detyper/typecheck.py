@@ -170,6 +170,8 @@ def _query_position(node: ast.AST) -> tuple[int, int]:
         end_col = getattr(node, 'end_col_offset', None)
         if end_col is not None:
             col = max(col, end_col - len(node.attr))
+    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        col = col + (6 if isinstance(node, ast.AsyncFunctionDef) else 4 if isinstance(node, ast.FunctionDef) else 6)
     return line, col
 
 
@@ -180,7 +182,7 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
     still gets ``pyright_type = None`` so downstream code has a stable shape.
     """
     exprs = [node for node in ast.walk(tree) if isinstance(node, ast.expr)]
-    symbol_nodes = [node for node in ast.walk(tree) if isinstance(node, (ast.Name, ast.Attribute, ast.Call, ast.arg))]
+    symbol_nodes = [node for node in ast.walk(tree) if isinstance(node, (ast.Name, ast.Attribute, ast.Call, ast.arg, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
     for node in exprs:
         setattr(node, 'pyright_type', None)
     for node in symbol_nodes:

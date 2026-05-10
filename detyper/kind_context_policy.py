@@ -28,6 +28,8 @@ class Place(StrEnum):
     RETURN_VALUES = 'return_values'
     FIELD_READS = 'field_reads'
     ATTRIBUTE_RECEIVERS = 'attribute_receivers'
+    SUBSCRIPT_INDICES = 'subscript_indices'
+    SUBSCRIPT_RESULTS = 'subscript_results'
     FIELD_WRITES = 'field_writes'
     CONSTRUCTOR_CALL_ARGS = 'constructor_call_args'
     MODULE_GLOBAL_READS = 'module_global_reads'
@@ -70,6 +72,8 @@ POLICY: PolicyTable = {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
             Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
             Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -103,6 +107,8 @@ POLICY: PolicyTable = {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
             Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
             Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -134,6 +140,8 @@ POLICY: PolicyTable = {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
             Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
             Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
@@ -257,6 +265,8 @@ for context in [
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_tuple': {'dynamic_any': {}},
@@ -289,6 +299,8 @@ POLICY.update({
             Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
             Place.LOCAL_READS: ('wrap_runtime_type',),
             Place.MODULE_GLOBAL_READS: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
             Place.FUNCTION_CALL_SITES: ('preserve_argument_mutations',),
             Place.METHOD_CALL_SITES: ('preserve_argument_mutations',),
         }},
@@ -449,6 +461,8 @@ for _context in ['function_parameter_annotation_with_optional', 'method_paramete
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
             Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
             Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.SUBSCRIPT_INDICES: ('wrap_box',),
+            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),

@@ -95,6 +95,12 @@ def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[a
     receiver_ids = tree.detyping_indexes.get('attribute_receivers_by_annotation', {}).get(str(annotation.detyping_id), [])
     if receiver_ids:
         places[Place.ATTRIBUTE_RECEIVERS] = [tree.detyping_node_index[int(node_id)] for node_id in receiver_ids]
+    subscript_index_ids = tree.detyping_indexes.get('subscript_indices_by_annotation', {}).get(str(annotation.detyping_id), [])
+    if subscript_index_ids:
+        places[Place.SUBSCRIPT_INDICES] = [tree.detyping_node_index[int(node_id)] for node_id in subscript_index_ids]
+    subscript_result_ids = tree.detyping_indexes.get('subscript_results_by_annotation', {}).get(str(annotation.detyping_id), [])
+    if subscript_result_ids:
+        places[Place.SUBSCRIPT_RESULTS] = [tree.detyping_node_index[int(node_id)] for node_id in subscript_result_ids]
     override_ids = tree.detyping_indexes.get('override_family_annotations_by_annotation', {}).get(str(annotation.detyping_id), [])
     if override_ids:
         places[Place.OVERRIDE_FAMILY_ANNOTATION_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in override_ids]
@@ -158,6 +164,12 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
                         detyper.add(make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name))
                         continue
                     action_typ = _nonnull_type_expr(rec.get('annotation_src'), rec.get('resolved_type_src')) if action == Action.WRAP_NONNULL_RUNTIME_TYPE else typ
+                    if place == Place.SUBSCRIPT_RESULTS:
+                        result_rec = tree.detyping_indexes.get('subscript_result_uses', {}).get(str(target.detyping_id), {})
+                        if result_rec.get('is_slice'):
+                            action_typ = _type_expr(result_rec.get('container_type_src')) or action_typ
+                        else:
+                            action_typ = _type_expr(result_rec.get('element_type_src')) or action_typ
                     if wrap_args := _wrap_args(action, action_typ):
                         target_context = _annotation_context(target, tree)
                         detyper.add(make_wrap_intent(target, target_context, wrap_args, _func_name(target_context)))

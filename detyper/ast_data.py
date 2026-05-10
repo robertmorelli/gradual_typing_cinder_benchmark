@@ -211,7 +211,7 @@ class _IndexBuilder(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._record_common(node)
         base_names = [b.id for b in node.bases if isinstance(b, ast.Name)]
-        self.classes[str(node.detyping_id)] = {'id': node.detyping_id, 'name': node.name, 'base_names': base_names}
+        self.classes[str(node.detyping_id)] = {'id': node.detyping_id, 'name': node.name, 'base_names': base_names, 'base_ids': [b.detyping_id for b in node.bases if hasattr(b, 'detyping_id')]}
         if base_names:
             self.class_bases[node.name] = base_names[0]
         self._bind(node.name, node, 'class')
@@ -334,6 +334,24 @@ def _name_of_type(expr: ast.expr | None) -> str | None:
         return None
 
 
+def _container_element_type_src(type_src: str | None) -> str | None:
+    if not type_src:
+        return None
+    try:
+        expr = ast.parse(type_src, mode='eval').body
+    except SyntaxError:
+        return None
+    if isinstance(expr, ast.Subscript):
+        base = _name_of_type(expr.value)
+        if base in {'CheckedList', 'list', 'List'}:
+            return _name_of_type(expr.slice)
+        if base in {'CheckedDict', 'dict', 'Dict'}:
+            sl = expr.slice
+            if isinstance(sl, ast.Tuple) and len(sl.elts) == 2:
+                return _name_of_type(sl.elts[1])
+    return None
+
+
 def _clean_pyright_type(raw: str | None) -> str | None:
     if not raw:
         return None
@@ -382,6 +400,8 @@ def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, functi
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
     if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type[') or ' is equivalent to ' in (pyright_resolved or '') or 'There is no runtime checking' in (pyright_resolved or ''):
+        pyright_resolved = None
+    if annotation_src and (annotation_src.startswith(('CheckedList[', 'CheckedDict[')) or annotation_src in {'int64', 'cbool', 'clen'}):
         pyright_resolved = None
     if kind in {'function_return_annotation', 'method_return_annotation'} and annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
         pyright_resolved = None
@@ -786,6 +806,72 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         ids[:] = sorted(set(ids))
 
 
+    def _subscript_index_exprs(slice_node: ast.expr) -> list[ast.expr]:
+        if isinstance(slice_node, ast.Slice):
+            out: list[ast.expr] = []
+            for part in (slice_node.lower, slice_node.upper, slice_node.step):
+                if part is not None:
+                    out.extend(_subscript_index_exprs(part))
+            return out
+        if isinstance(slice_node, ast.Tuple):
+            out: list[ast.expr] = []
+            for elt in slice_node.elts:
+                out.extend(_subscript_index_exprs(elt))
+            return out
+        return [slice_node]
+
+    primitive_index_converters = {
+        'int64', 'int32', 'int16', 'int8',
+        'uint64', 'uint32', 'uint16', 'uint8',
+    }
+
+    def _expr_is_cinder_scalar_index(expr: ast.expr) -> bool:
+        if _expr_type_metadata(expr, aliases, int_enum_names).get('pyright_type_kind') == 'cinder_scalar':
+            return True
+        if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) and expr.func.id in primitive_index_converters:
+            return True
+        ann_id = _annotation_id_for_name_use(expr) if isinstance(expr, ast.Name) else None
+        if ann_id is not None:
+            return annotations.get(str(ann_id), {}).get('type_kind') == 'cinder_scalar'
+        if isinstance(expr, ast.Attribute):
+            field_use = field_uses.get(str(expr.detyping_id), {})
+            for field_key in field_use.get('field_keys', []):
+                field_ann_id = field_definitions.get(field_key, {}).get('annotation_id')
+                if field_ann_id is not None and annotations.get(str(field_ann_id), {}).get('type_kind') == 'cinder_scalar':
+                    return True
+        return False
+
+    subscript_indices_by_annotation: dict[str, list[int]] = {}
+    subscript_results_by_annotation: dict[str, list[int]] = {}
+    subscript_result_uses: dict[str, dict[str, Any]] = {}
+    for node in by_id.values():
+        if not isinstance(node, ast.Subscript):
+            continue
+        ann_id = None
+        if isinstance(node.value, ast.Name):
+            ann_id = _annotation_id_for_name_use(node.value)
+        if ann_id is None:
+            continue
+        ann_rec = annotations.get(str(ann_id), {})
+        element_type_src = _container_element_type_src(ann_rec.get('annotation_src')) or _container_element_type_src(ann_rec.get('resolved_type_src'))
+        for index_expr in _subscript_index_exprs(node.slice):
+            if _expr_is_cinder_scalar_index(index_expr):
+                subscript_indices_by_annotation.setdefault(str(ann_id), []).append(index_expr.detyping_id)
+        subscript_results_by_annotation.setdefault(str(ann_id), []).append(node.detyping_id)
+        subscript_result_uses[str(node.detyping_id)] = {
+            'id': node.detyping_id,
+            'container_annotation_id': ann_id,
+            'container_type_kind': ann_rec.get('type_kind'),
+            'container_type_src': ann_rec.get('resolved_type_src'),
+            'element_type_src': element_type_src,
+            'is_slice': isinstance(node.slice, ast.Slice),
+            **_expr_type_metadata(node, aliases, int_enum_names),
+        }
+    for ids in subscript_indices_by_annotation.values():
+        ids[:] = sorted(set(ids))
+    for ids in subscript_results_by_annotation.values():
+        ids[:] = sorted(set(ids))
+
     call_arg_uses: dict[str, dict[str, Any]] = {}
     call_args_by_param_annotation: dict[str, list[int]] = {}
     literal_call_args_by_param_annotation: dict[str, list[int]] = {}
@@ -886,10 +972,87 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
 
     override_family_annotations_by_annotation: dict[str, list[int]] = {}
     annotation_sync_groups: dict[str, list[int]] = {}
+    pyright_class_bases: dict[str, list[int]] = {}
+    for raw_class_id, cls in base.classes.items():
+        base_class_ids: list[int] = []
+        for base_id in cls.get('base_ids', []):
+            base_node = by_id.get(int(base_id))
+            if base_node is None:
+                continue
+            base_name = _name_of_type(base_node)
+            for line in _definition_start_lines(base_node):
+                resolved = class_ids_by_name_line.get((base_name, line))
+                if resolved is not None:
+                    base_class_ids.append(resolved)
+        pyright_class_bases[str(raw_class_id)] = sorted(set(base_class_ids))
+
+    def _ancestor_class_ids(class_id: int) -> set[int]:
+        seen: set[int] = set()
+        stack = list(pyright_class_bases.get(str(class_id), []))
+        while stack:
+            parent = stack.pop()
+            if parent in seen:
+                continue
+            seen.add(parent)
+            stack.extend(pyright_class_bases.get(str(parent), []))
+        return seen
+
+    methods_by_class_name: dict[tuple[int, str], int] = {}
+    for raw_func_id, func in base.functions.items():
+        class_id = func.get('class_id')
+        if class_id is not None:
+            methods_by_class_name[(int(class_id), func['name'])] = int(raw_func_id)
+    override_edges: dict[int, set[int]] = {}
+    method_items = list(methods_by_class_name.items())
+    for (class_id, method_name), func_id in method_items:
+        for (other_class_id, other_name), other_func_id in method_items:
+            if func_id == other_func_id or method_name != other_name:
+                continue
+            if other_class_id in _ancestor_class_ids(class_id) or class_id in _ancestor_class_ids(other_class_id):
+                override_edges.setdefault(func_id, set()).add(other_func_id)
+                override_edges.setdefault(other_func_id, set()).add(func_id)
+    override_func_groups: list[list[int]] = []
+    seen_funcs: set[int] = set()
+    for func_id in sorted(override_edges):
+        if func_id in seen_funcs:
+            continue
+        stack = [func_id]
+        group: set[int] = set()
+        while stack:
+            item = stack.pop()
+            if item in group:
+                continue
+            group.add(item)
+            stack.extend(override_edges.get(item, set()))
+        seen_funcs.update(group)
+        if len(group) > 1:
+            override_func_groups.append(sorted(group))
+
+    for func_ids in override_func_groups:
+        return_ids = [base.functions[str(fid)].get('return_annotation_id') for fid in func_ids]
+        return_ids = [int(item) for item in return_ids if item is not None and str(item) in annotations]
+        for ann_id in return_ids:
+            override_family_annotations_by_annotation[str(ann_id)] = sorted(item for item in return_ids if item != ann_id)
+            annotation_sync_groups[str(ann_id)] = sorted(return_ids)
+        max_args = max(len(base.functions[str(fid)].get('arg_ids', [])) for fid in func_ids)
+        for index in range(max_args):
+            param_ann_ids: list[int] = []
+            for fid in func_ids:
+                ann_id = _param_annotation_id(fid, index)
+                if ann_id is not None:
+                    param_ann_ids.append(ann_id)
+            if len(param_ann_ids) > 1:
+                for ann_id in param_ann_ids:
+                    override_family_annotations_by_annotation[str(ann_id)] = sorted(item for item in param_ann_ids if item != ann_id)
+                    annotation_sync_groups[str(ann_id)] = sorted(param_ann_ids)
 
     call_result_uses: dict[str, dict[str, Any]] = {}
     call_results_by_return_annotation: dict[str, list[int]] = {}
-    for def_id, call_ids in function_uses_by_def.items():
+    call_ids_by_return_def: dict[str, list[int]] = {}
+    for source in (function_uses_by_def, method_uses_by_def):
+        for def_id, call_ids in source.items():
+            call_ids_by_return_def.setdefault(str(def_id), []).extend(int(call_id) for call_id in call_ids)
+    for def_id, call_ids in call_ids_by_return_def.items():
         func = base.functions.get(str(def_id), {})
         return_annotation_id = func.get('return_annotation_id')
         if return_annotation_id is not None and str(return_annotation_id) in annotations:
@@ -931,8 +1094,13 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'field_reads_by_annotation': field_reads_by_annotation,
         'attribute_receiver_uses': attribute_receiver_uses,
         'attribute_receivers_by_annotation': attribute_receivers_by_annotation,
+        'subscript_indices_by_annotation': subscript_indices_by_annotation,
+        'subscript_results_by_annotation': subscript_results_by_annotation,
+        'subscript_result_uses': subscript_result_uses,
         'override_family_annotations_by_annotation': override_family_annotations_by_annotation,
         'annotation_sync_groups': annotation_sync_groups,
+        'pyright_class_bases': pyright_class_bases,
+        'override_function_groups': override_func_groups,
         'call_result_uses': call_result_uses,
         'call_results_by_return_annotation': call_results_by_return_annotation,
         'attributes': attributes,
