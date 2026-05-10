@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .kind_context_policy import Place, affinity_for_place
 from .type_classifier import classification_metadata
 
 _JSON_PRIMITIVE = (str, int, float, bool, type(None))
@@ -907,7 +908,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         }
         call_arg_uses[str(arg_id)] = rec
         call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
-        if isinstance(by_id[arg_id], (ast.List, ast.ListComp)):
+        if isinstance(by_id[arg_id], (ast.Constant, ast.List, ast.ListComp, ast.Tuple, ast.Set, ast.Dict)):
             literal_call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
 
     for call_id, use_rec in function_uses.items():
@@ -1069,6 +1070,69 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                     **_expr_type_metadata(call_node, aliases, int_enum_names),
                 }
 
+    def _place_record(place: Place, node_id: int, **payload: Any) -> dict[str, Any]:
+        return {
+            'place': str(place),
+            'node_id': int(node_id),
+            'affinity': affinity_for_place(place),
+            'slot_key': str(int(node_id)),
+            **payload,
+        }
+
+    place_records_by_annotation: dict[str, list[dict[str, Any]]] = {}
+    for raw_ann_id, rec in annotations.items():
+        ann_id = int(raw_ann_id)
+        records: list[dict[str, Any]] = [_place_record(Place.ANNOTATION_SITE, ann_id)]
+        ann_node = by_id.get(ann_id)
+        if isinstance(ann_node, ast.AnnAssign) and ann_node.value is not None:
+            records.append(_place_record(Place.ANNOTATED_VALUE, ann_node.value.detyping_id))
+
+        function_id = rec.get('function_id')
+        if rec.get('context') in {'function_return_annotation', 'method_return_annotation'} and function_id is not None:
+            for node_id in base.returns_by_function.get(str(function_id), []):
+                records.append(_place_record(Place.RETURN_VALUES, int(node_id)))
+
+        read_place = Place.MODULE_GLOBAL_READS if rec.get('context', '').startswith('module_global_') else Place.LOCAL_READS
+        for node_id in name_reads_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(read_place, int(node_id)))
+        for node_id in reassign_rhs_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.REASSIGN_RHS, int(node_id)))
+        for node_id in field_reassign_rhs_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.FIELD_REASSIGN_RHS, int(node_id)))
+        for node_id in field_reads_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.FIELD_READS, int(node_id)))
+        for node_id in attribute_receivers_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.ATTRIBUTE_RECEIVERS, int(node_id)))
+        for node_id in subscript_indices_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.SUBSCRIPT_INDICES, int(node_id)))
+        for node_id in subscript_results_by_annotation.get(str(ann_id), []):
+            use = subscript_result_uses.get(str(node_id), {})
+            records.append(_place_record(
+                Place.SUBSCRIPT_RESULTS,
+                int(node_id),
+                is_slice=use.get('is_slice'),
+                container_type_src=use.get('container_type_src'),
+                element_type_src=use.get('element_type_src'),
+            ))
+        for node_id in override_family_annotations_by_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.OVERRIDE_FAMILY_ANNOTATION_SITES, int(node_id)))
+        literal_arg_ids = {int(node_id) for node_id in literal_call_args_by_param_annotation.get(str(ann_id), [])}
+        scalar_arg_ids = {int(node_id) for node_id in call_args_by_param_annotation_and_arg_kind.get(str(ann_id), {}).get('cinder_scalar', [])}
+        object_arg_ids = {int(node_id) for node_id in call_args_by_param_annotation_and_arg_kind.get(str(ann_id), {}).get('python_user_object', [])}
+        for node_id in call_args_by_param_annotation.get(str(ann_id), []):
+            node_id = int(node_id)
+            if node_id in literal_arg_ids:
+                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_LITERAL, node_id))
+            elif node_id in scalar_arg_ids:
+                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR, node_id))
+            elif node_id in object_arg_ids:
+                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT, node_id))
+            else:
+                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_VALUE, node_id))
+        for node_id in call_results_by_return_annotation.get(str(ann_id), []):
+            records.append(_place_record(Place.CALL_RESULTS_FROM_RETURN, int(node_id)))
+        place_records_by_annotation[str(ann_id)] = records
+
     return {
         'aliases': aliases,
         'int_enum_names': sorted(int_enum_names),
@@ -1108,6 +1172,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'field_uses': field_uses,
         'field_uses_by_field': field_uses_by_field,
         'annotations': annotations,
+        'place_records_by_annotation': place_records_by_annotation,
         'annotations_by_function': annotations_by_function,
         'ann_assigns_by_function': base.ann_assigns_by_function,
         'returns_by_function': base.returns_by_function,

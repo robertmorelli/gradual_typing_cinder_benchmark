@@ -37,7 +37,9 @@ def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
     if kind in ('cast', 'container'):
         return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
     if kind == 'checked_list':
-        return ast.Call(func=typ, args=[expr], keywords=[])
+        if isinstance(expr, (ast.List, ast.ListComp)):
+            return ast.Call(func=typ, args=[expr], keywords=[])
+        return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
     return expr
 
 

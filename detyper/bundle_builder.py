@@ -1,7 +1,23 @@
-"""Stage 2: build detyper_map bundles from ast_data metadata.
+"""Stage 2: turn Stage-1 place records plus policy rows into intent bundles.
 
-Small cave rule: stage 1 finds facts, policy table says what to do, this file
-turns place/action pairs into concrete intents.
+KEEP THIS FILE BORING.
+
+Threat model, per project owner: if semantic discovery logic appears in this
+file, an orphanage full of children gets it.  Do not endanger the children.
+
+Stage 1 owns discovery: which nodes are relevant, which place each node belongs
+in, which affinity/slot a place uses, and any per-place payload needed by an
+action.  This file must not rediscover AST relationships, classify uses, infer
+special cases, or decide that one index implies another.
+
+Allowed here:
+- read annotation records and Stage-1 place_records_by_annotation;
+- look up policy(context, source_kind, target_kind);
+- translate one policy action at one place record into one concrete intent.
+
+If logic wants to ask "is this a slice?", "is this a module global?", "which
+call argument is this?", or "what node should this place target?", that logic
+belongs in ast_data.py as explicit Stage-1 data, not here.
 """
 
 from __future__ import annotations
@@ -9,7 +25,7 @@ from __future__ import annotations
 import ast
 
 from .ast_data import AstData, ast_from_data
-from .kind_context_policy import Action, Place, policy_for
+from .kind_context_policy import Action, Place, is_smoothing_action, policy_for
 from .intent_types import Arg, intent_to_json, make_preserve_argument_mutations_intent, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent
 from .intent_unifiers import IntentSet
 
@@ -58,76 +74,53 @@ def _func_name(context: ast.AST) -> str:
     return context.name if isinstance(context, ast.FunctionDef) else '<module>'
 
 
-def _places(annotation: ast.AST, rec: dict, tree: ast.AST) -> dict[Place, list[ast.AST]]:
-    places: dict[Place, list[ast.AST]] = {Place.ANNOTATION_SITE: [annotation]}
-    if isinstance(annotation, ast.AnnAssign) and annotation.value is not None:
-        places[Place.ANNOTATED_VALUE] = [annotation.value]
+def _annotation_type(rec: dict) -> ast.expr | None:
+    type_src = rec.get('resolved_type_src')
+    annotation_src = rec.get('annotation_src')
+    if annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
+        type_src = annotation_src
+    return _type_expr(type_src)
 
-    function_id = rec.get('function_id')
-    if rec.get('context') in {'function_return_annotation', 'method_return_annotation'} and function_id is not None:
-        return_ids = tree.detyping_indexes.get('returns_by_function', {}).get(str(function_id), [])
-        if return_ids:
-            places[Place.RETURN_VALUES] = [tree.detyping_node_index[int(node_id)] for node_id in return_ids]
-        function_call_ids = tree.detyping_indexes.get('function_uses_by_def', {}).get(str(function_id), [])
-        if function_call_ids:
-            places[Place.FUNCTION_CALL_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in function_call_ids]
-        method_call_ids = tree.detyping_indexes.get('method_uses_by_def', {}).get(str(function_id), [])
-        if method_call_ids:
-            places[Place.METHOD_CALL_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in method_call_ids]
 
-    read_ids = tree.detyping_indexes.get('name_reads_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if read_ids:
-        read_nodes = [tree.detyping_node_index[int(node_id)] for node_id in read_ids]
-        places[Place.LOCAL_READS] = read_nodes
-        if rec.get('context', '').startswith('module_global_'):
-            places[Place.MODULE_GLOBAL_READS] = read_nodes
+def _action_type(action: Action, annotation_rec: dict, place_rec: dict, default_typ: ast.expr | None) -> ast.expr | None:
+    if action == Action.WRAP_NONNULL_RUNTIME_TYPE:
+        return _nonnull_type_expr(annotation_rec.get('annotation_src'), annotation_rec.get('resolved_type_src'))
+    if Place(place_rec['place']) == Place.SUBSCRIPT_RESULTS:
+        if place_rec.get('is_slice'):
+            return _type_expr(place_rec.get('container_type_src')) or default_typ
+        return _type_expr(place_rec.get('element_type_src')) or default_typ
+    return default_typ
 
-    reassign_ids = tree.detyping_indexes.get('reassign_rhs_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if reassign_ids:
-        places[Place.REASSIGN_RHS] = [tree.detyping_node_index[int(node_id)] for node_id in reassign_ids]
 
-    field_reassign_ids = tree.detyping_indexes.get('field_reassign_rhs_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if field_reassign_ids:
-        places[Place.FIELD_REASSIGN_RHS] = [tree.detyping_node_index[int(node_id)] for node_id in field_reassign_ids]
-    field_read_ids = tree.detyping_indexes.get('field_reads_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if field_read_ids:
-        places[Place.FIELD_READS] = [tree.detyping_node_index[int(node_id)] for node_id in field_read_ids]
-    receiver_ids = tree.detyping_indexes.get('attribute_receivers_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if receiver_ids:
-        places[Place.ATTRIBUTE_RECEIVERS] = [tree.detyping_node_index[int(node_id)] for node_id in receiver_ids]
-    subscript_index_ids = tree.detyping_indexes.get('subscript_indices_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if subscript_index_ids:
-        places[Place.SUBSCRIPT_INDICES] = [tree.detyping_node_index[int(node_id)] for node_id in subscript_index_ids]
-    subscript_result_ids = tree.detyping_indexes.get('subscript_results_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if subscript_result_ids:
-        places[Place.SUBSCRIPT_RESULTS] = [tree.detyping_node_index[int(node_id)] for node_id in subscript_result_ids]
-    override_ids = tree.detyping_indexes.get('override_family_annotations_by_annotation', {}).get(str(annotation.detyping_id), [])
-    if override_ids:
-        places[Place.OVERRIDE_FAMILY_ANNOTATION_SITES] = [tree.detyping_node_index[int(node_id)] for node_id in override_ids]
-
-    call_arg_ids = tree.detyping_indexes.get('call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
-    if call_arg_ids:
-        places[Place.CALL_ARGS_TO_PARAMETER] = [tree.detyping_node_index[int(node_id)] for node_id in call_arg_ids]
-    literal_call_arg_ids = tree.detyping_indexes.get('literal_call_args_by_param_annotation', {}).get(str(annotation.detyping_id), [])
-    if literal_call_arg_ids:
-        places[Place.LITERAL_CALL_ARGS_TO_PARAMETER] = [tree.detyping_node_index[int(node_id)] for node_id in literal_call_arg_ids]
-    call_args_by_kind = tree.detyping_indexes.get('call_args_by_param_annotation_and_arg_kind', {}).get(str(annotation.detyping_id), {})
-    scalar_arg_ids = call_args_by_kind.get('cinder_scalar', [])
-    if scalar_arg_ids:
-        places[Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR] = [tree.detyping_node_index[int(node_id)] for node_id in scalar_arg_ids]
-    object_arg_ids = call_args_by_kind.get('python_user_object', [])
-    if object_arg_ids:
-        places[Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT] = [tree.detyping_node_index[int(node_id)] for node_id in object_arg_ids]
-
-    call_result_ids = tree.detyping_indexes.get('call_results_by_return_annotation', {}).get(str(annotation.detyping_id), [])
-    if call_result_ids:
-        places[Place.CALL_RESULTS_FROM_RETURN] = [tree.detyping_node_index[int(node_id)] for node_id in call_result_ids]
-    return places
+def _make_action_intent(action: Action, target: ast.AST, context: ast.AST, typ: ast.expr | None, rec: dict, place_rec: dict, tree: ast.AST):
+    context_name = _func_name(context)
+    if action == Action.REMOVE_ANNOTATION:
+        return make_remove_annotation_intent(target, context, [Arg(None, None)], context_name)
+    if action == Action.REWRITE_PARAM_BINDING and isinstance(target, ast.arg) and isinstance(context, ast.FunctionDef):
+        return make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name)
+    if action == Action.PRESERVE_ARGUMENT_MUTATIONS:
+        call_id = place_rec.get('call_id')
+        arg_index = place_rec.get('arg_index')
+        if call_id is None or arg_index is None:
+            return None
+        return make_preserve_argument_mutations_intent(tree.detyping_node_index[int(call_id)], tree, [Arg(int(arg_index), typ)], '<module>')
+    if wrap_args := _wrap_args(action, typ):
+        intent = make_wrap_intent(target, context, wrap_args, context_name)
+        intent.affinity = place_rec.get('affinity')
+        intent.policy_place = place_rec.get('place')
+        intent.policy_action = str(action)
+        intent.smoothing = is_smoothing_action(action)
+        intent.slot_key = place_rec.get('slot_key')
+        intent.all_symmetric_key = place_rec.get('all_symmetric_key')
+        intent.all_symmetric_total = place_rec.get('all_symmetric_total')
+        return intent
+    return None
 
 
 def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str] | None = None, target_kind: str = 'dynamic_any') -> dict:
     tree = ast_from_data(ast_data)
     annotations = tree.detyping_indexes.get('annotations', {})
+    place_records_by_annotation = tree.detyping_indexes.get('place_records_by_annotation', {})
     if annotation_ids is None:
         annotation_ids = [str(item) for item in sorted(int(key) for key in annotations)]
 
@@ -135,44 +128,22 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
         rec = annotations.get(str(annotation_id))
         if rec is None:
             return
-        node = tree.detyping_node_index[int(annotation_id)]
-        context = _annotation_context(node, tree)
-        type_src = rec.get('resolved_type_src')
-        annotation_src = rec.get('annotation_src')
-        if annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
-            type_src = annotation_src
-        typ = _type_expr(type_src)
-        context_name = _func_name(context)
-        detyper.add(make_remove_annotation_intent(node, context, [Arg(None, None)], context_name))
-        places = _places(node, rec, tree)
+        annotation_node = tree.detyping_node_index[int(annotation_id)]
+        annotation_context = _annotation_context(annotation_node, tree)
+        typ = _annotation_type(rec)
+        detyper.add(make_remove_annotation_intent(annotation_node, annotation_context, [Arg(None, None)], _func_name(annotation_context)))
         policy = policy_for(rec['context'], rec['type_kind'], target_kind)
-        for place, actions in policy.items():
-            for target in places.get(place, []):
-                for action in actions:
-                    if action == Action.REMOVE_ANNOTATION:
-                        detyper.add(make_remove_annotation_intent(target, _annotation_context(target, tree), [Arg(None, None)], _func_name(_annotation_context(target, tree))))
-                        continue
-                    if action == Action.PRESERVE_ARGUMENT_MUTATIONS:
-                        call_arg = tree.detyping_indexes.get('call_arg_uses', {}).get(str(target.detyping_id), {})
-                        call_id = call_arg.get('call_id')
-                        arg_index = call_arg.get('arg_index')
-                        if call_id is not None and arg_index is not None:
-                            call_node = tree.detyping_node_index[int(call_id)]
-                            detyper.add(make_preserve_argument_mutations_intent(call_node, tree, [Arg(int(arg_index), typ)], '<module>'))
-                        continue
-                    if action == Action.REWRITE_PARAM_BINDING and isinstance(node, ast.arg) and isinstance(context, ast.FunctionDef):
-                        detyper.add(make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name))
-                        continue
-                    action_typ = _nonnull_type_expr(rec.get('annotation_src'), rec.get('resolved_type_src')) if action == Action.WRAP_NONNULL_RUNTIME_TYPE else typ
-                    if place == Place.SUBSCRIPT_RESULTS:
-                        result_rec = tree.detyping_indexes.get('subscript_result_uses', {}).get(str(target.detyping_id), {})
-                        if result_rec.get('is_slice'):
-                            action_typ = _type_expr(result_rec.get('container_type_src')) or action_typ
-                        else:
-                            action_typ = _type_expr(result_rec.get('element_type_src')) or action_typ
-                    if wrap_args := _wrap_args(action, action_typ):
-                        target_context = _annotation_context(target, tree)
-                        detyper.add(make_wrap_intent(target, target_context, wrap_args, _func_name(target_context)))
+
+        for place_rec in place_records_by_annotation.get(str(annotation_id), []):
+            place = Place(place_rec['place'])
+            target = tree.detyping_node_index[int(place_rec['node_id'])]
+            context = _annotation_context(target, tree)
+            for action in policy.get(place, ()):
+                action = Action(action)
+                action_typ = _action_type(action, rec, place_rec, typ)
+                intent = _make_action_intent(action, target, context, action_typ, rec, place_rec, tree)
+                if intent is not None:
+                    detyper.add(intent)
 
     bundles: dict[str, list[dict]] = {}
     sync_groups = tree.detyping_indexes.get('annotation_sync_groups', {})
@@ -181,9 +152,8 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
             bundles[str(annotation_id)] = []
             continue
         detyper = IntentSet()
-        group_ids = sync_groups.get(str(annotation_id), [int(annotation_id)])
-        for group_annotation_id in group_ids:
+        for group_annotation_id in sync_groups.get(str(annotation_id), [int(annotation_id)]):
             add_annotation_policy(detyper, str(group_annotation_id))
         bundles[str(annotation_id)] = [intent_to_json(intent) for intent in detyper.intentions()]
 
-    return {'version': 2, 'target_kind': target_kind, 'annotation_ids': annotation_ids, 'bundles': bundles}
+    return {'version': 2, 'target_kind': target_kind, 'annotation_ids': annotation_ids, 'annotation_sync_groups': sync_groups, 'bundles': bundles}

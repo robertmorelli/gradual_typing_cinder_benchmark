@@ -23,7 +23,8 @@ IntentKind = Literal[
     'unwrap_box',
 ]
 
-IntentionKey = tuple[int, int, IntentKind]
+Affinity = Literal['producer', 'consumer']
+IntentionKey = tuple[int, int, IntentKind, Affinity | None, str | None, str | None]
 NodeCollisionKey = tuple[int, int]
 
 INTENT_EXECUTION_ORDER: list[IntentKind] = [
@@ -56,9 +57,17 @@ class Intent:
     lineno: int = 0
     col_offset: int = 0
     node_kind: str = ''
+    affinity: Affinity | None = None
+    policy_place: str | None = None
+    policy_action: str | None = None
+    smoothing: bool = False
+    slot_key: str | None = None
+    all_symmetric_key: str | None = None
+    all_symmetric_total: int | None = None
+    should_execute: bool = True
 
     def key(self) -> IntentionKey:
-        return (self.location_id, self.context_id, self.kind)
+        return (self.location_id, self.context_id, self.kind, self.affinity, self.policy_place, self.slot_key)
 
     def node_collision_key(self) -> NodeCollisionKey:
         return (self.location_id, self.context_id)
@@ -68,7 +77,24 @@ class Intent:
         return (self.func_name, self.lineno, self.col_offset, self.node_kind, self.location_id, precedence_index(self.kind))
 
     def clone(self) -> 'Intent':
-        return Intent(self.kind, self.location_id, self.context_id, list(self.args), self.func_name, self.lineno, self.col_offset, self.node_kind)
+        return Intent(
+            self.kind,
+            self.location_id,
+            self.context_id,
+            list(self.args),
+            self.func_name,
+            self.lineno,
+            self.col_offset,
+            self.node_kind,
+            self.affinity,
+            self.policy_place,
+            self.policy_action,
+            self.smoothing,
+            self.slot_key,
+            self.all_symmetric_key,
+            self.all_symmetric_total,
+            self.should_execute,
+        )
 
 
 def make_intent(kind: IntentKind, location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
@@ -129,6 +155,14 @@ def intent_to_json(intent: Intent) -> dict:
         'lineno': intent.lineno,
         'col_offset': intent.col_offset,
         'node_kind': intent.node_kind,
+        'affinity': intent.affinity,
+        'policy_place': intent.policy_place,
+        'policy_action': intent.policy_action,
+        'smoothing': intent.smoothing,
+        'slot_key': intent.slot_key,
+        'all_symmetric_key': intent.all_symmetric_key,
+        'all_symmetric_total': intent.all_symmetric_total,
+        'should_execute': intent.should_execute,
     }
 
 
@@ -142,4 +176,12 @@ def intent_from_json(data: dict) -> Intent:
         lineno=data.get('lineno', 0),
         col_offset=data.get('col_offset', 0),
         node_kind=data.get('node_kind', ''),
+        affinity=data.get('affinity'),
+        policy_place=data.get('policy_place'),
+        policy_action=data.get('policy_action'),
+        smoothing=bool(data.get('smoothing', False)),
+        slot_key=data.get('slot_key'),
+        all_symmetric_key=data.get('all_symmetric_key'),
+        all_symmetric_total=data.get('all_symmetric_total'),
+        should_execute=bool(data.get('should_execute', True)),
     )

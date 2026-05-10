@@ -427,7 +427,13 @@ def build_detyped_program_from_ast_data(ast_data: AstData, detyper_map: dict, pe
     tree = ast_from_data(ast_data)
     selected_ids = [annotation_id for annotation_id, bit in zip(detyper_map['annotation_ids'], perm) if bit]
     detyper = IntentSet()
+    applied_groups: set[tuple[int, ...]] = set()
+    sync_groups = detyper_map.get('annotation_sync_groups', {})
     for annotation_id in selected_ids:
+        group = tuple(sorted(int(item) for item in sync_groups.get(str(annotation_id), [int(annotation_id)])))
+        if group in applied_groups:
+            continue
+        applied_groups.add(group)
         for intent_data in detyper_map['bundles'][annotation_id]:
             detyper.add(intent_from_json(intent_data))
     detyper.execute(node_index(tree))

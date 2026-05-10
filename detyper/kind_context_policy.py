@@ -18,10 +18,8 @@ class Place(StrEnum):
     LOCAL_WRITES = 'local_writes'
     REASSIGN_RHS = 'reassign_rhs'
     FIELD_REASSIGN_RHS = 'field_reassign_rhs'
-    FUNCTION_CALL_SITES = 'function_call_sites'
-    METHOD_CALL_SITES = 'method_call_sites'
-    CALL_ARGS_TO_PARAMETER = 'call_args_to_parameter'
-    LITERAL_CALL_ARGS_TO_PARAMETER = 'literal_call_args_to_parameter'
+    CALL_ARGS_TO_PARAMETER_VALUE = 'call_args_to_parameter_value'
+    CALL_ARGS_TO_PARAMETER_LITERAL = 'call_args_to_parameter_literal'
     CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR = 'call_args_to_parameter_from_cinder_scalar'
     CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT = 'call_args_to_parameter_from_python_object'
     CALL_RESULTS_FROM_RETURN = 'call_results_from_return'
@@ -59,19 +57,80 @@ PolicyBySource: TypeAlias = dict[str, PolicyByTarget]
 PolicyTable: TypeAlias = dict[str, PolicyBySource]
 
 
+PRODUCER_PLACES: set[Place] = {
+    Place.LOCAL_READS,
+    Place.MODULE_GLOBAL_READS,
+    Place.FIELD_READS,
+    Place.CLASS_ATTRIBUTE_READS,
+    Place.INSTANCE_FIELD_READS,
+    Place.SUBSCRIPT_RESULTS,
+    Place.CALL_RESULTS_FROM_RETURN,
+}
+
+CONSUMER_PLACES: set[Place] = {
+    Place.ANNOTATED_VALUE,
+    Place.REASSIGN_RHS,
+    Place.FIELD_REASSIGN_RHS,
+    Place.CALL_ARGS_TO_PARAMETER_VALUE,
+    Place.CALL_ARGS_TO_PARAMETER_LITERAL,
+    Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR,
+    Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT,
+    Place.SUBSCRIPT_INDICES,
+    Place.ATTRIBUTE_RECEIVERS,
+    Place.RETURN_VALUES,
+    Place.FIELD_WRITES,
+    Place.CONSTRUCTOR_CALL_ARGS,
+    Place.MODULE_GLOBAL_WRITES,
+    Place.CLASS_ATTRIBUTE_WRITES,
+    Place.INSTANCE_FIELD_WRITES,
+}
+
+SMOOTHING_ACTIONS: set[Action] = {
+    Action.WRAP_RUNTIME_TYPE,
+    Action.WRAP_BOX,
+    Action.WRAP_RUNTIME_TYPE_THEN_BOX,
+    Action.UNWRAP_BOX,
+    Action.UNWRAP_CHECKED_RETURN_VALUE,
+    Action.WRAP_NONNULL_RUNTIME_TYPE,
+}
+
+
+def affinity_for_place(place: Place | str) -> str | None:
+    place = Place(place)
+    if place in PRODUCER_PLACES:
+        return 'producer'
+    if place in CONSUMER_PLACES:
+        return 'consumer'
+    return None
+
+
+def is_smoothing_action(action: Action | str) -> bool:
+    return Action(action) in SMOOTHING_ACTIONS
+
+
+def annihilates(producer_place: str | None, producer_action: str | None, consumer_place: str | None, consumer_action: str | None) -> bool:
+    if producer_action is None or consumer_action is None:
+        return False
+    if not is_smoothing_action(producer_action) or not is_smoothing_action(consumer_action):
+        return False
+    if producer_place is None or consumer_place is None:
+        return False
+    return affinity_for_place(producer_place) == 'producer' and affinity_for_place(consumer_place) == 'consumer'
+
+
 # One big table. No clever shared policy aliases: when a square breaks, edit the
 # square bob is looking at.
 POLICY: PolicyTable = {
     'function_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
             Place.REASSIGN_RHS: ('wrap_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
             Place.SUBSCRIPT_INDICES: ('wrap_box',),
             Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
@@ -100,13 +159,13 @@ POLICY: PolicyTable = {
     'method_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
             Place.SUBSCRIPT_INDICES: ('wrap_box',),
             Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
@@ -133,13 +192,13 @@ POLICY: PolicyTable = {
     'constructor_parameter_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
             Place.REASSIGN_RHS: ('wrap_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
             Place.SUBSCRIPT_INDICES: ('wrap_box',),
             Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},
@@ -158,7 +217,6 @@ POLICY: PolicyTable = {
     'function_return_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
-            Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_checked_container': {'dynamic_any': {
@@ -166,7 +224,6 @@ POLICY: PolicyTable = {
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_static_container': {'dynamic_any': {
-            Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'python_scalar': {'dynamic_any': {}},
@@ -191,8 +248,6 @@ POLICY: PolicyTable = {
     'method_return_annotation': {
         'cinder_scalar': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
-            Place.FUNCTION_CALL_SITES: ('wrap_runtime_type',),
-            Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
@@ -209,7 +264,6 @@ POLICY: PolicyTable = {
         'python_user_object': {'dynamic_any': {
             Place.RETURN_VALUES: ('wrap_runtime_type',),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-            Place.METHOD_CALL_SITES: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
         'optional': {'dynamic_any': {
@@ -301,8 +355,7 @@ POLICY.update({
             Place.MODULE_GLOBAL_READS: ('wrap_runtime_type',),
             Place.SUBSCRIPT_INDICES: ('wrap_box',),
             Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-            Place.FUNCTION_CALL_SITES: ('preserve_argument_mutations',),
-            Place.METHOD_CALL_SITES: ('preserve_argument_mutations',),
+            Place.CALL_RESULTS_FROM_RETURN: ('preserve_argument_mutations',),
         }},
         'python_scalar': {'dynamic_any': {}},
         'python_tuple': {'dynamic_any': {}},
@@ -455,12 +508,12 @@ for _context in ['function_parameter_annotation_with_optional', 'method_paramete
         'python_container': {'dynamic_any': {}},
         'cinder_scalar': {'dynamic_any': {
             Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type_then_box',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
         }},
         'cinder_checked_container': {'dynamic_any': {
             Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
-            Place.LITERAL_CALL_ARGS_TO_PARAMETER: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
             Place.SUBSCRIPT_INDICES: ('wrap_box',),
             Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
         }},

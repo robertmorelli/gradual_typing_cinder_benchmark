@@ -1,65 +1,84 @@
-"""Canonical intent combine rules."""
+"""Slot-based intent execution rules."""
 
 from __future__ import annotations
 
-import ast
 from ast import AST
 
 from .intent_impls import apply_intent
-from .intent_types import Arg, Intent, IntentionKey, NodeCollisionKey
+from .intent_types import Intent
+from .kind_context_policy import annihilates
 
 
-def _arg_marker(intent: Intent, arg: Arg) -> tuple:
-    typ_key = ast.dump(arg.typ) if arg.typ is not None else 'None'
-    if intent.kind == 'wrap':
-        return (arg.index, typ_key, arg.wrap_order)
-    return (arg.index, typ_key)
+def _annihilation_slot(intent: Intent) -> tuple[str, str] | None:
+    if not intent.smoothing or intent.affinity not in {'producer', 'consumer'}:
+        return None
+    return (intent.slot_key or str(intent.location_id), intent.affinity)
 
 
-def merge_intents_of_same_kind(existing: Intent, incoming: Intent) -> Intent:
-    assert existing.kind == incoming.kind
-    assert existing.key() == incoming.key()
-
-    merged = list(existing.args) + list(incoming.args)
-    seen: set[tuple] = set()
-    deduped: list[Arg] = []
-    for arg in merged:
-        marker = _arg_marker(existing, arg)
-        if marker in seen:
-            continue
-        seen.add(marker)
-        deduped.append(arg)
-    existing.args = deduped
-    return existing
+def _intent_debug(intent: Intent) -> str:
+    return f'kind={intent.kind} loc={intent.location_id} ctx={intent.context_id} affinity={intent.affinity} place={intent.policy_place} action={intent.policy_action} slot={intent.slot_key}'
 
 
-def resolve_same_node_intents(intents: list[Intent]) -> list[Intent]:
-    canonical_by_kind: dict[IntentionKey, Intent] = {}
+def _place_in_slots(intents: list[Intent]) -> dict[str, dict[str, Intent]]:
+    slots: dict[str, dict[str, Intent]] = {}
     for intent in intents:
-        key = intent.key()
-        existing = canonical_by_kind.get(key)
-        if existing is None:
-            canonical_by_kind[key] = intent
-        else:
-            canonical_by_kind[key] = merge_intents_of_same_kind(existing, intent)
-    return sorted(canonical_by_kind.values(), key=lambda intent: intent.sort_key)
+        slot = _annihilation_slot(intent)
+        if slot is None:
+            continue
+        slot_key, affinity = slot
+        sides = slots.setdefault(slot_key, {})
+        existing = sides.get(affinity)
+        if existing is not None:
+            raise ValueError(
+                f'duplicate intents in same node slot {(slot_key, affinity)}: '
+                f'{_intent_debug(existing)}; {_intent_debug(intent)}'
+            )
+        sides[affinity] = intent
+    return slots
+
+
+def mark_symmetric_execution(intents: list[Intent]) -> list[Intent]:
+    marked = [intent.clone() for intent in intents]
+    for intent in marked:
+        intent.should_execute = True
+
+    slots = _place_in_slots(marked)
+    for sides in slots.values():
+        producer = sides.get('producer')
+        consumer = sides.get('consumer')
+        if producer is not None and consumer is not None and annihilates(producer.policy_place, producer.policy_action, consumer.policy_place, consumer.policy_action):
+            producer.should_execute = False
+            consumer.should_execute = False
+
+    by_all: dict[str, list[Intent]] = {}
+    for intent in marked:
+        if intent.smoothing and intent.all_symmetric_key:
+            by_all.setdefault(intent.all_symmetric_key, []).append(intent)
+    for grouped in by_all.values():
+        total = grouped[0].all_symmetric_total
+        affinities = {intent.affinity for intent in grouped}
+        if total is not None and len(grouped) >= total and {'producer', 'consumer'} <= affinities:
+            for intent in grouped:
+                intent.should_execute = False
+
+    return marked
+
+
+# Backcompat name for existing debug scripts.
+def annihilate_smoothing_intents(intents: list[Intent]) -> list[Intent]:
+    return [intent for intent in mark_symmetric_execution(intents) if intent.should_execute]
 
 
 class IntentSet:
-    """Intent algebra keyed by location/context/kind."""
+    """A bag of intents routed through explicit producer/consumer slots."""
 
     def __init__(self, intent: Intent | None = None):
-        self._by_kind: dict[IntentionKey, Intent] = {}
+        self._intents: list[Intent] = []
         if intent is not None:
             self.add(intent)
 
     def add(self, intent: Intent) -> None:
-        key = intent.key()
-        existing = self._by_kind.get(key)
-        if existing is None:
-            self._by_kind[key] = intent.clone()
-        else:
-            self._by_kind[key] = merge_intents_of_same_kind(existing, intent)
+        self._intents.append(intent.clone())
 
     def extend(self, intents: list[Intent]) -> None:
         for intent in intents:
@@ -73,15 +92,9 @@ class IntentSet:
         return [intent.clone() for intent in self._sorted()]
 
     def _sorted(self) -> list[Intent]:
-        by_node: dict[NodeCollisionKey, list[Intent]] = {}
-        for intent in self._by_kind.values():
-            by_node.setdefault(intent.node_collision_key(), []).append(intent.clone())
-
-        canonicalized: list[Intent] = []
-        for same_node_intents in by_node.values():
-            canonicalized.extend(resolve_same_node_intents(same_node_intents))
-
-        return sorted(canonicalized, key=lambda intent: intent.sort_key)
+        marked = mark_symmetric_execution(self._intents)
+        executable = [intent for intent in marked if intent.should_execute]
+        return sorted(executable, key=lambda intent: intent.sort_key)
 
     def execute(self, nodes: dict[int, AST]) -> None:
         for intent in self._sorted():
