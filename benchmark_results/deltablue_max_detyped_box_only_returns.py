@@ -71,7 +71,7 @@ class Constraint(object):
         if not self.is_satisfied():
             if cast(Strength, self.strength) == REQUIRED:
                 print('Could not satisfy a required constraint!')
-            return None
+            return cast(Constraint | None, None)
         self.mark_inputs(mark)
         out = cast(Variable, self.output())
         overridden = cast(Constraint | None, out.determined_by)
@@ -80,7 +80,7 @@ class Constraint(object):
         out.determined_by = self
         if not cbool(planner.add_propagate(self, mark)):
             print('Cycle encountered')
-        out.mark = box(int64(mark))
+        out.mark = box(int64(int64(mark)))
         return cast(Constraint | None, overridden)
 
     def destroy_constraint(self):
@@ -91,13 +91,13 @@ class Constraint(object):
             self.remove_from_graph()
 
     def is_input(self):
-        return False
+        return box(cbool(False))
 
     def mark_inputs(self, mark):
         pass
 
     def inputs_known(self, mark):
-        return True
+        return box(cbool(True))
 
     def choose_method(self, mark):
         pass
@@ -118,33 +118,33 @@ class UrnaryConstraint(Constraint):
 
     def add_to_graph(self):
         cast(Variable, self.my_output).add_constraint(self)
-        self.satisfied = False
+        self.satisfied = box(cbool(False))
 
     def choose_method(self, mark):
         if int64(cast(Variable, self.my_output).mark) != int64(mark) and cbool(stronger(cast(Strength, self.strength), cast(Strength, cast(Variable, self.my_output).walk_strength))):
-            self.satisfied = True
+            self.satisfied = box(cbool(True))
         else:
-            self.satisfied = False
+            self.satisfied = box(cbool(False))
 
     def is_satisfied(self):
-        return box(cbool(self.satisfied))
+        return box(cbool(cbool(self.satisfied)))
 
     def output(self):
         return cast(Variable, cast(Variable, self.my_output))
 
     def recalculate(self):
         cast(Variable, self.my_output).walk_strength = cast(Strength, self.strength)
-        cast(Variable, self.my_output).stay = box(not cbool(self.is_input()))
+        cast(Variable, self.my_output).stay = box(cbool(not cbool(self.is_input())))
         if cbool(cast(Variable, self.my_output).stay):
             self.execute()
 
     def mark_unsatisfied(self):
-        self.satisfied = False
+        self.satisfied = box(cbool(False))
 
     def remove_from_graph(self):
         if cast(Variable, self.my_output) is not None:
             cast(Variable, self.my_output).remove_constraint(self)
-            self.satisfied = False
+            self.satisfied = box(cbool(False))
 
 @final
 class StayConstraint(UrnaryConstraint):
@@ -154,7 +154,7 @@ class StayConstraint(UrnaryConstraint):
 class EditConstraint(UrnaryConstraint):
 
     def is_input(self):
-        return True
+        return box(cbool(True))
 
 @final
 class Direction(IntEnum):
@@ -199,11 +199,11 @@ class BinaryConstraint(Constraint):
 
     def is_satisfied(self):
         if self.direction != Direction.NONE:
-            return True
-        return False
+            return box(cbool(True))
+        return box(cbool(False))
 
     def mark_inputs(self, mark):
-        cast(Variable, self.input()).mark = box(int64(mark))
+        cast(Variable, self.input()).mark = box(int64(int64(mark)))
 
     def input(self):
         return cast(Variable, cast(Variable, self.v1) if self.direction == Direction.FORWARD else cast(Variable, self.v2))
@@ -215,7 +215,7 @@ class BinaryConstraint(Constraint):
         ihn = cast(Variable, self.input())
         out = cast(Variable, self.output())
         out.walk_strength = cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength)))
-        out.stay = box(cbool(ihn.stay))
+        out.stay = box(cbool(cbool(ihn.stay)))
         if cbool(out.stay):
             self.execute()
 
@@ -224,7 +224,7 @@ class BinaryConstraint(Constraint):
 
     def inputs_known(self, mark):
         i = cast(Variable, self.input())
-        return box(int64(i.mark) == int64(mark) or cbool(i.stay) or cbool(cast(Constraint | None, i.determined_by) is None))
+        return box(cbool(int64(i.mark) == int64(mark) or cbool(i.stay) or cbool(cast(Constraint | None, i.determined_by) is None)))
 
     def remove_from_graph(self):
         if cast(Variable, self.v1) is not None:
@@ -256,20 +256,20 @@ class ScaleConstraint(BinaryConstraint):
 
     def mark_inputs(self, mark):
         BinaryConstraint.mark_inputs(self, mark)
-        cast(Variable, self.scale).mark = box(int64(mark))
-        cast(Variable, self.offset).mark = box(int64(mark))
+        cast(Variable, self.scale).mark = box(int64(int64(mark)))
+        cast(Variable, self.offset).mark = box(int64(int64(mark)))
 
     def execute(self):
         if self.direction == Direction.FORWARD:
-            cast(Variable, self.v2).value = box(int64(cast(Variable, self.v1).value) * int64(cast(Variable, self.scale).value) + int64(cast(Variable, self.offset).value))
+            cast(Variable, self.v2).value = box(int64(int64(cast(Variable, self.v1).value) * int64(cast(Variable, self.scale).value) + int64(cast(Variable, self.offset).value)))
         else:
-            cast(Variable, self.v1).value = box((int64(cast(Variable, self.v2).value) - int64(cast(Variable, self.offset).value)) / int64(cast(Variable, self.scale).value))
+            cast(Variable, self.v1).value = box(int64((int64(cast(Variable, self.v2).value) - int64(cast(Variable, self.offset).value)) / int64(cast(Variable, self.scale).value)))
 
     def recalculate(self):
         ihn = cast(Variable, self.input())
         out = cast(Variable, self.output())
         out.walk_strength = cast(Strength, weakest_of(cast(Strength, self.strength), cast(Strength, ihn.walk_strength)))
-        out.stay = box(cbool(ihn.stay) and cbool(cast(Variable, self.scale).stay) and cbool(cast(Variable, self.offset).stay))
+        out.stay = box(cbool(cbool(ihn.stay) and cbool(cast(Variable, self.scale).stay) and cbool(cast(Variable, self.offset).stay)))
         if cbool(out.stay):
             self.execute()
 
@@ -277,7 +277,7 @@ class ScaleConstraint(BinaryConstraint):
 class EqualityConstraint(BinaryConstraint):
 
     def execute(self):
-        cast(Variable, self.output()).value = box(int64(cast(Variable, self.input()).value))
+        cast(Variable, self.output()).value = box(int64(int64(cast(Variable, self.input()).value)))
 
 @final
 class Variable(object):
@@ -327,8 +327,8 @@ class Planner(object):
 
     def new_mark(self):
         x = int64(self.current_mark) + 1
-        self.current_mark = box(x)
-        return box(int64(self.current_mark))
+        self.current_mark = box(int64(x))
+        return box(int64(int64(self.current_mark)))
 
     def make_plan(self, sources):
         sources = cast(CheckedList[UrnaryConstraint], sources)
@@ -339,7 +339,7 @@ class Planner(object):
             c = todo.pop(0)
             if int64(cast(Variable, c.output()).mark) != mark and cbool(c.inputs_known(box(mark))):
                 plan.add_constraint(c)
-                cast(Variable, c.output()).mark = box(mark)
+                cast(Variable, c.output()).mark = box(int64(mark))
                 self.add_constraints_consuming_to(cast(Variable, c.output()), cast(CheckedList[Constraint], todo))
         return cast(Plan, plan)
 
@@ -358,15 +358,15 @@ class Planner(object):
             d = todo.pop(0)
             if int64(cast(Variable, d.output()).mark) == int64(mark):
                 self.incremental_remove(cast(Constraint, c))
-                return False
+                return box(cbool(False))
             d.recalculate()
             self.add_constraints_consuming_to(cast(Variable, d.output()), cast(CheckedList[Constraint], todo))
-        return True
+        return box(cbool(True))
 
     def remove_propagate_from(self, out):
         out.determined_by = None
         out.walk_strength = WEAKEST
-        out.stay = True
+        out.stay = box(cbool(True))
         unsatisfied = CheckedList[Constraint]([])
         todo = CheckedList[Variable]([])
         todo.append(cast(Variable, out))
@@ -459,7 +459,7 @@ def chain_test(n):
     plan = cast(Plan, planner.extract_plan_from_constraints(cast(CheckedList[UrnaryConstraint], edits)))
     i = box(int64(0))
     while int64(i) < 100:
-        first.value = i
+        first.value = box(int64(int64(i)))
         plan.execute()
         if int64(last.value) != int64(i):
             print('Chain test failed.')
@@ -515,7 +515,7 @@ def change(v, new_value):
     plan = cast(Plan, planner.extract_plan_from_constraints(cast(CheckedList[UrnaryConstraint], edits)))
     i = box(int64(0))
     while int64(i) < 10:
-        v.value = box(int64(new_value))
+        v.value = box(int64(int64(new_value)))
         plan.execute()
         i = box(int64(int64(i) + 1))
     edit.destroy_constraint()

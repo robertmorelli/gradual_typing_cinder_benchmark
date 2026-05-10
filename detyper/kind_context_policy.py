@@ -17,18 +17,21 @@ class Place(StrEnum):
     LOCAL_READS = 'local_reads'
     LOCAL_WRITES = 'local_writes'
     REASSIGN_RHS = 'reassign_rhs'
-    FIELD_REASSIGN_RHS = 'field_reassign_rhs'
+    FIELD_REASSIGN_RHS_VALUE = 'field_reassign_rhs_value'
+    FIELD_REASSIGN_RHS_LITERAL = 'field_reassign_rhs_literal'
     CALL_ARGS_TO_PARAMETER_VALUE = 'call_args_to_parameter_value'
     CALL_ARGS_TO_PARAMETER_LITERAL = 'call_args_to_parameter_literal'
     CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR = 'call_args_to_parameter_from_cinder_scalar'
     CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT = 'call_args_to_parameter_from_python_object'
     CALL_RESULTS_FROM_RETURN = 'call_results_from_return'
     RETURN_VALUES = 'return_values'
+    RETURN_LITERALS = 'return_literals'
     FIELD_READS = 'field_reads'
     ATTRIBUTE_RECEIVERS = 'attribute_receivers'
     SUBSCRIPT_INDICES = 'subscript_indices'
     SUBSCRIPT_RESULTS = 'subscript_results'
-    FIELD_WRITES = 'field_writes'
+    FIELD_WRITES_VALUE = 'field_writes_value'
+    FIELD_WRITES_LITERAL = 'field_writes_literal'
     CONSTRUCTOR_CALL_ARGS = 'constructor_call_args'
     MODULE_GLOBAL_READS = 'module_global_reads'
     MODULE_GLOBAL_WRITES = 'module_global_writes'
@@ -36,7 +39,8 @@ class Place(StrEnum):
     CLASS_ATTRIBUTE_WRITES = 'class_attribute_writes'
     OVERRIDE_FAMILY_ANNOTATION_SITES = 'override_family_annotation_sites'
     INSTANCE_FIELD_READS = 'instance_field_reads'
-    INSTANCE_FIELD_WRITES = 'instance_field_writes'
+    INSTANCE_FIELD_WRITES_VALUE = 'instance_field_writes_value'
+    INSTANCE_FIELD_WRITES_LITERAL = 'instance_field_writes_literal'
 
 
 class Action(StrEnum):
@@ -70,7 +74,8 @@ PRODUCER_PLACES: set[Place] = {
 CONSUMER_PLACES: set[Place] = {
     Place.ANNOTATED_VALUE,
     Place.REASSIGN_RHS,
-    Place.FIELD_REASSIGN_RHS,
+    Place.FIELD_REASSIGN_RHS_VALUE,
+    Place.FIELD_REASSIGN_RHS_LITERAL,
     Place.CALL_ARGS_TO_PARAMETER_VALUE,
     Place.CALL_ARGS_TO_PARAMETER_LITERAL,
     Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR,
@@ -78,11 +83,14 @@ CONSUMER_PLACES: set[Place] = {
     Place.SUBSCRIPT_INDICES,
     Place.ATTRIBUTE_RECEIVERS,
     Place.RETURN_VALUES,
-    Place.FIELD_WRITES,
+    Place.RETURN_LITERALS,
+    Place.FIELD_WRITES_VALUE,
+    Place.FIELD_WRITES_LITERAL,
     Place.CONSTRUCTOR_CALL_ARGS,
     Place.MODULE_GLOBAL_WRITES,
     Place.CLASS_ATTRIBUTE_WRITES,
-    Place.INSTANCE_FIELD_WRITES,
+    Place.INSTANCE_FIELD_WRITES_VALUE,
+    Place.INSTANCE_FIELD_WRITES_LITERAL,
 }
 
 SMOOTHING_ACTIONS: set[Action] = {
@@ -216,7 +224,8 @@ POLICY: PolicyTable = {
     },
     'function_return_annotation': {
         'cinder_scalar': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            Place.RETURN_VALUES: ('wrap_box',),
+            Place.RETURN_LITERALS: (),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
         }},
         'cinder_checked_container': {'dynamic_any': {
@@ -247,7 +256,8 @@ POLICY: PolicyTable = {
     },
     'method_return_annotation': {
         'cinder_scalar': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            Place.RETURN_VALUES: ('wrap_box',),
+            Place.RETURN_LITERALS: (),
             Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
             Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
         }},
@@ -396,7 +406,8 @@ for context in [
 ]:
     POLICY[context] = {
         'cinder_scalar': {'dynamic_any': {
-            Place.INSTANCE_FIELD_WRITES: ('wrap_runtime_type_then_box',),
+            Place.INSTANCE_FIELD_WRITES_VALUE: ('wrap_box',),
+            Place.INSTANCE_FIELD_WRITES_LITERAL: (),
             Place.INSTANCE_FIELD_READS: ('wrap_runtime_type',),
         }},
         'python_scalar': {'dynamic_any': {}},
@@ -415,7 +426,8 @@ for context in [
     POLICY[context] = {
         'cinder_scalar': {'dynamic_any': {
             Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
-            Place.FIELD_REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+            Place.FIELD_REASSIGN_RHS_VALUE: ('wrap_box',),
+            Place.FIELD_REASSIGN_RHS_LITERAL: (),
             Place.FIELD_READS: ('wrap_runtime_type',),
         }},
         'cinder_checked_container': {'dynamic_any': {}},

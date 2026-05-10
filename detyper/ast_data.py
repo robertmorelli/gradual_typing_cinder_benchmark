@@ -1090,7 +1090,10 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         function_id = rec.get('function_id')
         if rec.get('context') in {'function_return_annotation', 'method_return_annotation'} and function_id is not None:
             for node_id in base.returns_by_function.get(str(function_id), []):
-                records.append(_place_record(Place.RETURN_VALUES, int(node_id)))
+                return_node = by_id[int(node_id)]
+                value = return_node.value if isinstance(return_node, ast.Return) else None
+                place = Place.RETURN_LITERALS if isinstance(value, ast.Constant) else Place.RETURN_VALUES
+                records.append(_place_record(place, int(node_id)))
 
         read_place = Place.MODULE_GLOBAL_READS if rec.get('context', '').startswith('module_global_') else Place.LOCAL_READS
         for node_id in name_reads_by_annotation.get(str(ann_id), []):
@@ -1098,7 +1101,11 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         for node_id in reassign_rhs_by_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.REASSIGN_RHS, int(node_id)))
         for node_id in field_reassign_rhs_by_annotation.get(str(ann_id), []):
-            records.append(_place_record(Place.FIELD_REASSIGN_RHS, int(node_id)))
+            node_id = int(node_id)
+            use = field_reassign_rhs_uses.get(str(node_id), {})
+            rhs = by_id.get(int(use.get('rhs_id'))) if use.get('rhs_id') is not None else by_id[node_id]
+            place = Place.FIELD_REASSIGN_RHS_LITERAL if isinstance(rhs, ast.Constant) else Place.FIELD_REASSIGN_RHS_VALUE
+            records.append(_place_record(place, node_id))
         for node_id in field_reads_by_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.FIELD_READS, int(node_id)))
         for node_id in attribute_receivers_by_annotation.get(str(ann_id), []):
