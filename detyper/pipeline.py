@@ -12,15 +12,6 @@ from .annotation_sites import annotation_selection_closure, annotation_sites_fro
 from .ast_data import AstData, ast_from_data, build_ast_data, read_ast_data, write_ast_data as write_ast_data_json
 from .bundle_builder import build_detyper_map_from_ast_data as build_policy_detyper_map_from_ast_data
 from .ast_utils import all_function_defs, node_index
-from .generators import (
-    generate_tasks_body,
-    generate_tasks_constructor_calls,
-    generate_tasks_global_annotations,
-    generate_tasks_params_calls,
-    generate_tasks_params_definition,
-    generate_tasks_return_calls,
-    generate_tasks_return_definition,
-)
 from .plan_data import build_plan_data
 from .intent_types import intent_from_json, intent_to_json
 from .intent_unifiers import IntentSet
@@ -423,10 +414,10 @@ def build_detyper_map(source: str, annotation_ids: list[str] | None = None) -> d
     return build_detyper_map_from_ast_data(build_ast_data(source), annotation_ids)
 
 
-def build_detyped_program_from_ast_data(ast_data: AstData, detyper_map: dict, perm: Permutation) -> DetypedProgram:
-    tree = ast_from_data(ast_data)
+def build_intent_table_from_detyper_map(detyper_map: dict, perm: Permutation) -> dict:
+    """Phase 3: blind join selected annotation ids to prebuilt intent bundles."""
     selected_ids = [annotation_id for annotation_id, bit in zip(detyper_map['annotation_ids'], perm) if bit]
-    detyper = IntentSet()
+    intents: list[dict] = []
     applied_groups: set[tuple[int, ...]] = set()
     sync_groups = detyper_map.get('annotation_sync_groups', {})
     for annotation_id in selected_ids:
@@ -434,13 +425,33 @@ def build_detyped_program_from_ast_data(ast_data: AstData, detyper_map: dict, pe
         if group in applied_groups:
             continue
         applied_groups.add(group)
-        for intent_data in detyper_map['bundles'][annotation_id]:
-            detyper.add(intent_from_json(intent_data))
+        intents.extend(detyper_map['bundles'][str(annotation_id)])
+    return {
+        'version': 1,
+        'perm': list(perm),
+        'perm_hex': perm_name(perm),
+        'selected_annotation_ids': selected_ids,
+        'intents': intents,
+    }
+
+
+def build_detyped_program_from_intent_table(ast_data: AstData, intent_table: dict) -> DetypedProgram:
+    """Phase 4: execute intent table on AST and emit source."""
+    tree = ast_from_data(ast_data)
+    detyper = IntentSet()
+    for intent_data in intent_table.get('intents', []):
+        detyper.add(intent_from_json(intent_data))
     detyper.execute(node_index(tree))
     _post_process(tree)
     _inject_static_imports(tree)
     ast.fix_missing_locations(tree)
-    return DetypedProgram(perm=perm, perm_hex=perm_name(perm), source=ast.unparse(tree))
+    perm = tuple(bool(bit) for bit in intent_table.get('perm', ()))
+    return DetypedProgram(perm=perm, perm_hex=intent_table.get('perm_hex', perm_name(perm)), source=ast.unparse(tree))
+
+
+def build_detyped_program_from_ast_data(ast_data: AstData, detyper_map: dict, perm: Permutation) -> DetypedProgram:
+    intent_table = build_intent_table_from_detyper_map(detyper_map, perm)
+    return build_detyped_program_from_intent_table(ast_data, intent_table)
 
 
 def build_detyped_program_from_map(source: str, detyper_map: dict, perm: Permutation) -> DetypedProgram:
@@ -511,8 +522,23 @@ def write_detyper_map_from_ast_data(ast_data_path: Path, output_path: Path, anno
     return output_path
 
 
+def write_intent_table_from_detyper_map(detyper_map_path: Path, output_path: Path, perm: Permutation) -> Path:
+    """Phase 3: write selected intent table using only the detyper map."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(build_intent_table_from_detyper_map(read_detyper_map(detyper_map_path), perm), indent=2), encoding='utf-8')
+    return output_path
+
+
+def write_detyped_program_from_intent_table(ast_data_path: Path, intent_table_path: Path, output_path: Path) -> Path:
+    """Phase 4: execute an intent table and emit source."""
+    program = build_detyped_program_from_intent_table(read_ast_data(ast_data_path), json.loads(intent_table_path.read_text(encoding='utf-8')))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(program.source, encoding='utf-8')
+    return output_path
+
+
 def write_detyped_program_from_ast_data(ast_data_path: Path, detyper_map_path: Path, output_path: Path, perm: Permutation) -> Path:
-    """Stage 3: apply a detyper map using only JSON artifacts and emit source."""
+    """Compatibility wrapper: Phase 3 join, then Phase 4 execute."""
     program = build_detyped_program_from_ast_data(read_ast_data(ast_data_path), read_detyper_map(detyper_map_path), perm)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(program.source, encoding='utf-8')

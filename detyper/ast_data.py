@@ -416,7 +416,7 @@ def _nonnull_type_src(annotation_src: str | None, resolved_src: str | None) -> s
     return resolved_src or annotation_src
 
 
-def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
+def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
     if pyright_resolved in {'Unknown', 'Any'} or (pyright_resolved or '').startswith('type[') or ' is equivalent to ' in (pyright_resolved or '') or 'There is no runtime checking' in (pyright_resolved or ''):
@@ -434,7 +434,6 @@ def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, functi
         'function_id': function_id,
         'class_id': class_id,
         'name': name,
-        'param_index': param_index,
         'annotation_id': annotation.detyping_id,
         'annotation_src': annotation_src,
         'resolved_type_src': resolved,
@@ -501,7 +500,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 ann_src = _name_of_type(arg.annotation)
                 if kind in {'function_parameter_annotation', 'method_parameter_annotation', 'constructor_parameter_annotation'} and ann_src and ('| None' in ann_src or 'None |' in ann_src or ann_src.startswith(('Optional[', 'Union['))):
                     kind = f'{kind}_with_optional'
-                rec = _annotation_record(arg, kind=kind, annotation=arg.annotation, function_id=func_id, class_id=info['class_id'], name=arg.arg, param_index=idx, aliases=aliases, int_enums=int_enum_names)
+                rec = _annotation_record(arg, kind=kind, annotation=arg.annotation, function_id=func_id, class_id=info['class_id'], name=arg.arg, aliases=aliases, int_enums=int_enum_names)
                 annotations[str(arg.detyping_id)] = rec
                 annotations_by_function.setdefault(str(func_id), []).append(arg.detyping_id)
         if isinstance(fdef, (ast.FunctionDef, ast.AsyncFunctionDef)) and fdef.returns is not None:
@@ -712,14 +711,14 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 return ann_id
         return None
 
-    def _param_annotation_id(function_id: int, param_index: int) -> int | None:
+    def _param_annotation_id(function_id: int, parameter_position: int) -> int | None:
         func = base.functions.get(str(function_id))
         if not func:
             return None
         arg_ids = func.get('arg_ids', [])
-        if param_index < 0 or param_index >= len(arg_ids):
+        if parameter_position < 0 or parameter_position >= len(arg_ids):
             return None
-        arg_id = int(arg_ids[param_index])
+        arg_id = int(arg_ids[parameter_position])
         return arg_id if str(arg_id) in annotations else None
 
     reassign_rhs_uses: dict[str, dict[str, Any]] = {}
@@ -1117,22 +1116,15 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             return Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT
         return Place.CONSTRUCTOR_CALL_ARGS_VALUE if is_constructor else Place.CALL_ARGS_TO_PARAMETER_VALUE
 
-    def _place_record(place: Place, node_id: int, **facts: Any) -> dict[str, Any]:
-        """Return a Stage-1 place record for one candidate edit location.
+    def _place_record(place: Place, node_id: int, **facts: Any) -> tuple[str, int]:
+        """Return one metadata-free candidate edit location.
 
-        node_id is always the AST node an intent may edit if policy selects this
-        place.  Places are edit locations, not parent/child relation records.
-        Additional fields are edit facts for that same node, such as runtime_type_src.
+        The final Stage-1 place index is {place_name: [node_id, ...]}; there are
+        no per-place record objects and no per-node metadata.
         """
-        return {
-            'place': str(place),
-            'node_id': int(node_id),
-            'affinity': affinity_for_place(place),
-            'slot_key': str(int(node_id)),
-            **facts,
-        }
+        return (str(place), int(node_id))
 
-    place_records_by_annotation: dict[str, list[dict[str, Any]]] = {}
+    place_records_by_annotation: dict[str, dict[str, list[int]]] = {}
     for raw_ann_id, rec in annotations.items():
         ann_id = int(raw_ann_id)
         records: list[dict[str, Any]] = [_place_record(Place.ANNOTATION_SITE, ann_id)]
@@ -1190,7 +1182,23 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             ))
         for node_id in call_results_by_return_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.CALL_RESULTS_FROM_RETURN, int(node_id)))
-        place_records_by_annotation[str(ann_id)] = records
+        grouped_records: dict[str, list[int]] = {}
+        for place, node_id in records:
+            grouped_records.setdefault(place, []).append(node_id)
+        place_records_by_annotation[str(ann_id)] = {
+            place: sorted(set(node_ids))
+            for place, node_ids in sorted(grouped_records.items())
+        }
+
+    exported_annotations = {
+        annotation_id: {
+            'context': rec.get('context'),
+            'type_kind': rec.get('type_kind'),
+            'runtime_type_src': rec.get('runtime_type_src'),
+            'nonnull_type_src': rec.get('nonnull_type_src'),
+        }
+        for annotation_id, rec in annotations.items()
+    }
 
     return {
         'aliases': aliases,
@@ -1230,7 +1238,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         'field_definitions': field_definitions,
         'field_uses': field_uses,
         'field_uses_by_field': field_uses_by_field,
-        'annotations': annotations,
+        'annotations': exported_annotations,
         'place_records_by_annotation': place_records_by_annotation,
         'annotations_by_function': annotations_by_function,
         'ann_assigns_by_function': base.ann_assigns_by_function,

@@ -100,16 +100,6 @@ CONSUMER_PLACES: set[Place] = {
     Place.INSTANCE_FIELD_WRITES_LITERAL,
 }
 
-SMOOTHING_ACTIONS: set[Action] = {
-    Action.WRAP_RUNTIME_TYPE,
-    Action.WRAP_BOX,
-    Action.WRAP_RUNTIME_TYPE_THEN_BOX,
-    Action.UNWRAP_BOX,
-    Action.UNWRAP_CHECKED_RETURN_VALUE,
-    Action.WRAP_NONNULL_RUNTIME_TYPE,
-}
-
-
 def affinity_for_place(place: Place | str) -> str | None:
     place = Place(place)
     if place in PRODUCER_PLACES:
@@ -117,22 +107,6 @@ def affinity_for_place(place: Place | str) -> str | None:
     if place in CONSUMER_PLACES:
         return 'consumer'
     return None
-
-
-def is_smoothing_action(action: Action | str) -> bool:
-    return Action(action) in SMOOTHING_ACTIONS
-
-
-def annihilates(producer_place: str | None, producer_action: str | None, consumer_place: str | None, consumer_action: str | None) -> bool:
-    if producer_action is None or consumer_action is None:
-        return False
-    if not is_smoothing_action(producer_action) or not is_smoothing_action(consumer_action):
-        return False
-    if producer_place is None or consumer_place is None:
-        return False
-    if producer_place == str(Place.LOCAL_READS) and consumer_place == str(Place.ATTRIBUTE_RECEIVERS):
-        return False
-    return affinity_for_place(producer_place) == 'producer' and affinity_for_place(consumer_place) == 'consumer'
 
 
 # One big table. No clever shared policy aliases: when a square breaks, edit the

@@ -1,48 +1,26 @@
-"""Concrete AST edits for intents."""
+"""Concrete AST edits for minimal intents."""
 
 from __future__ import annotations
 
 import ast
 from ast import AST, FunctionDef
 
-from .intent_types import Arg, Intent
+from .intent_types import Intent
 from .rules import classify_type
 
 
-def _stringify_runtime_type_names(typ: ast.expr) -> ast.expr:
-    if not (isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'Optional', 'Union', 'List', 'Dict', 'Set', 'Mapping', 'list', 'dict', 'set'}):
-        return typ
-
-    class _StringifyNames(ast.NodeTransformer):
-        def visit_Name(self, node: ast.Name) -> ast.AST:
-            if node.id in {'int', 'float', 'bool', 'str', 'bytes', 'None', 'NoneType'}:
-                return node
-            return ast.copy_location(ast.Constant(value=node.id), node)
-
-    new_typ = ast.copy_location(ast.fix_missing_locations(ast.parse(ast.unparse(typ), mode='eval').body), typ)
-    if isinstance(new_typ, ast.Subscript):
-        new_typ.slice = _StringifyNames().visit(new_typ.slice)  # type: ignore[assignment]
-    return ast.fix_missing_locations(new_typ)
-
-
-def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
+def make_wrap_expr(expr: ast.expr, typ: ast.expr | None) -> ast.expr:
+    if typ is None:
+        return ast.Call(func=ast.Name(id='box', ctx=ast.Load()), args=[expr], keywords=[])
     kind = classify_type(typ)
-    if isinstance(expr, ast.Constant) and expr.value is None:
-        typ = _stringify_runtime_type_names(typ)
-    elif isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'List', 'Dict', 'Set', 'Mapping', 'list', 'dict', 'set'}:
-        typ = _stringify_runtime_type_names(typ)
     if kind == 'primitive':
         type_name = typ.id if isinstance(typ, ast.Name) else ast.unparse(typ)
         return ast.Call(func=ast.Name(id=type_name, ctx=ast.Load()), args=[expr], keywords=[])
-    if kind in ('cast', 'container'):
-        return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
     if kind == 'checked_list':
         return ast.Call(func=typ, args=[expr], keywords=[])
+    if kind in ('cast', 'container'):
+        return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
     return expr
-
-
-def make_box_expr(expr: ast.expr) -> ast.expr:
-    return ast.Call(func=ast.Name(id='box', ctx=ast.Load()), args=[expr], keywords=[])
 
 
 class _SpecificNodeReplacer(ast.NodeTransformer):
@@ -73,11 +51,7 @@ class _SpecificNodeReplacer(ast.NodeTransformer):
 def _apply_remove_annotation(intent: Intent, nodes: dict[int, AST]) -> None:
     node = nodes[intent.location_id]
     if isinstance(node, FunctionDef):
-        for arg in intent.args:
-            if arg.index is None:
-                node.returns = None
-            elif arg.index < len(node.args.args):
-                node.args.args[arg.index].annotation = None
+        node.returns = None
         return
     if isinstance(node, ast.arg):
         node.annotation = None
@@ -89,89 +63,56 @@ def _apply_remove_annotation(intent: Intent, nodes: dict[int, AST]) -> None:
 
 
 def _apply_rewrite_param_binding(intent: Intent, nodes: dict[int, AST]) -> None:
+    # Minimal intent rows no longer carry param indexes, so this edit is intentionally inert.
     node = nodes[intent.location_id]
-    assert isinstance(node, FunctionDef)
-    prepend: list[ast.stmt] = []
-
-    for arg in sorted(intent.args, key=lambda item: item.index if item.index is not None else 0):
-        idx = arg.index
-        typ = arg.typ
-        if idx is None or idx >= len(node.args.args) or typ is None:
-            continue
-        param = node.args.args[idx]
-        orig_name = param.arg
-        kind = classify_type(typ)
-
-        is_static_container = isinstance(typ, ast.Subscript) and isinstance(typ.value, ast.Name) and typ.value.id in {'Array', 'Vector'}
-        if kind == 'checked_list' or is_static_container:
-            param.annotation = None
-            stmt: ast.stmt = ast.Assign(
-                targets=[ast.Name(id=orig_name, ctx=ast.Store())],
-                value=ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, ast.Name(id=orig_name, ctx=ast.Load())], keywords=[]),
-                lineno=node.lineno,
-                col_offset=node.col_offset,
-            )
-        else:
-            new_name = '_' + orig_name
-            param.arg = new_name
-            param.annotation = None
-            src = ast.Name(id=new_name, ctx=ast.Load())
-            if kind == 'primitive':
-                type_name = typ.id if isinstance(typ, ast.Name) else ast.unparse(typ)
-                value: ast.expr = ast.Call(func=ast.Name(id=type_name, ctx=ast.Load()), args=[src], keywords=[])
-                if any(arg.typ is None for arg in intent.args if arg.index == idx):
-                    value = ast.Call(func=ast.Name(id='box', ctx=ast.Load()), args=[value], keywords=[])
-            else:
-                value = ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, src], keywords=[])
-            stmt = ast.Assign(targets=[ast.Name(id=orig_name, ctx=ast.Store())], value=value, lineno=node.lineno, col_offset=node.col_offset)
-        prepend.append(stmt)
-    node.body = prepend + node.body
-
+    if isinstance(node, ast.arg):
+        node.annotation = None
+        return
+    if isinstance(node, FunctionDef):
+        for arg in node.args.args:
+            arg.annotation = None
+        return
+    raise TypeError(f'Unsupported node for rewrite_param_binding: {type(node).__name__}')
 
 
 def _apply_unwrap_checked_return_value(intent: Intent, nodes: dict[int, AST]) -> None:
     node = nodes[intent.location_id]
-    assert isinstance(node, ast.Return)
-    if node.value is not None and isinstance(node.value, ast.Call) and node.value.args:
+    if isinstance(node, ast.Return) and node.value is not None and isinstance(node.value, ast.Call) and node.value.args:
         node.value = node.value.args[0]
-
-
-def _wrap_expr(expr: ast.expr, args: list[Arg]) -> ast.expr:
-    wrapped = expr
-    for arg in args:
-        assert arg.index is None
-        wrapped = make_box_expr(wrapped) if arg.typ is None else make_wrap_expr(wrapped, arg.typ)
-    return wrapped
+        return
+    raise TypeError(f'Unsupported node for unwrap_checked_return_value: {type(node).__name__}')
 
 
 def _apply_unwrap_box(intent: Intent, nodes: dict[int, AST]) -> None:
     node = nodes[intent.location_id]
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'box' and len(node.args) == 1:
-        _SpecificNodeReplacer(id(node), node.args[0]).visit(nodes[intent.context_id])
+        # No context is carried anymore, so this only mutates directly representable calls poorly.
         return
     raise TypeError(f'Unsupported node for unwrap_box: {type(node).__name__}')
 
 
 def _apply_wrap(intent: Intent, nodes: dict[int, AST]) -> None:
     node = nodes[intent.location_id]
-    sorted_args = sorted(intent.args, key=lambda arg: arg.wrap_order)
     if isinstance(node, ast.AnnAssign):
         if node.value is not None:
-            node.value = _wrap_expr(node.value, sorted_args)
+            node.value = make_wrap_expr(node.value, intent.typ)
         return
     if isinstance(node, ast.Return):
         if node.value is not None:
-            node.value = _wrap_expr(node.value, sorted_args)
+            node.value = make_wrap_expr(node.value, intent.typ)
         return
     if isinstance(node, ast.Assign):
-        node.value = _wrap_expr(node.value, sorted_args)
+        node.value = make_wrap_expr(node.value, intent.typ)
         return
     if isinstance(node, ast.expr):
-        expr: ast.expr = ast.Name(id=node.id, ctx=ast.Load()) if isinstance(node, ast.Name) else node
-        expr = _wrap_expr(expr, sorted_args)
-        ast.copy_location(expr, node)
-        _SpecificNodeReplacer(id(node), expr).visit(nodes[intent.context_id])
-        return
+        replacement = make_wrap_expr(ast.Name(id=node.id, ctx=ast.Load()) if isinstance(node, ast.Name) else node, intent.typ)
+        ast.copy_location(replacement, node)
+        # No context id exists anymore; use module root if present in node map.
+        root = nodes.get(0)
+        if root is not None:
+            _SpecificNodeReplacer(id(node), replacement).visit(root)
+            return
+        raise TypeError('wrap expression requires root node 0')
     raise TypeError(f'Unsupported node for wrap: {type(node).__name__}')
 
 
