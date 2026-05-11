@@ -1,0 +1,13 @@
+sample,detyped,total,status,msg,path
+0,95,167,RUNTIME_PASS,5.145089149475098 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_00_95of167.py
+1,93,167,RUNTIME_PASS,3.29892897605896 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_01_93of167.py
+2,81,167,RUNTIME_PASS,2.839529037475586 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_02_81of167.py
+3,95,167,RUNTIME_PASS,4.3714869022369385 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_03_95of167.py
+4,89,167,RUNTIME_PASS,2.8934850692749023 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_04_89of167.py
+5,76,167,RUNTIME_PASS,2.945376396179199 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_05_76of167.py
+6,91,167,RUNTIME_PASS,3.4205169677734375 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_06_91of167.py
+7,89,167,RUNTIME_PASS,3.2423431873321533 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_07_89of167.py
+8,90,167,RUNTIME_PASS,5.282535791397095 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_08_90of167.py
+9,73,167,RUNTIME_PASS,3.2638585567474365 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_09_73of167.py
+10,77,167,RUNTIME_PASS,2.333185911178589 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_10_77of167.py
+11,84,167,RUNTIME_PASS,3.35768723487854 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_advanced_12_random_compose/sample_11_84of167.py

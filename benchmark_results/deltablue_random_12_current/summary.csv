@@ -1,0 +1,13 @@
+sample,detyped,total,status,msg,path
+0,0,167,RUNTIME_PASS,0.8816571235656738 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_00_0of167.py
+1,167,167,RUNTIME_PASS,6.830559015274048 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_01_167of167.py
+2,95,167,RUNTIME_PASS,5.126967430114746 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_02_95of167.py
+3,93,167,RUNTIME_PASS,3.2519900798797607 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_03_93of167.py
+4,81,167,RUNTIME_PASS,2.8263096809387207 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_04_81of167.py
+5,95,167,RUNTIME_PASS,4.411500930786133 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_05_95of167.py
+6,89,167,RUNTIME_PASS,2.971550226211548 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_06_89of167.py
+7,76,167,RUNTIME_PASS,2.9749765396118164 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_07_76of167.py
+8,91,167,RUNTIME_PASS,3.403148651123047 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_08_91of167.py
+9,89,167,RUNTIME_PASS,3.2184762954711914 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_09_89of167.py
+10,90,167,RUNTIME_PASS,5.233659982681274 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_10_90of167.py
+11,73,167,RUNTIME_PASS,3.239513397216797 | JIT: Jit/jit_list.cpp:41 -- Jit-list file: /jitlist_main.txt | ,benchmark_results/deltablue_random_12_current/sample_11_73of167.py

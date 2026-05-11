@@ -66,7 +66,7 @@ DEFAULT_RULES: tuple[TypeRule, ...] = (
     TypeRule('none_only', exact=frozenset({'None', 'NoneType'})),
     TypeRule('optional', prefixes=('Optional[',), contains=(' | None', 'None |')),
     TypeRule('union', prefixes=('Union[',), contains=(' | ',)),
-    TypeRule('callable', prefixes=('Callable[',), regexes=(r'^\(.*\)\s*->\s*.+$',)),
+    TypeRule('callable', exact=frozenset({'Callable'}), prefixes=('Callable[',), regexes=(r'^\(.*\)\s*->\s*.+$',)),
     TypeRule('iterator', exact=frozenset({'Iterator', 'Generator'}), prefixes=('Iterator[', 'Generator[', 'Iterable[',)), 
     TypeRule('cinder_scalar', exact=frozenset({
         'int64', 'int32', 'int16', 'int8',

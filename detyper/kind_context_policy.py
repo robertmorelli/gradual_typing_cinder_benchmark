@@ -14,6 +14,8 @@ from typing import TypeAlias
 class Place(StrEnum):
     ANNOTATION_SITE = 'annotation_site'
     ANNOTATED_VALUE = 'annotated_value'
+    ANNOTATED_VALUE_VALUE = 'annotated_value_value'
+    ANNOTATED_VALUE_LITERAL = 'annotated_value_literal'
     LOCAL_READS = 'local_reads'
     LOCAL_WRITES = 'local_writes'
     REASSIGN_RHS = 'reassign_rhs'
@@ -33,6 +35,8 @@ class Place(StrEnum):
     FIELD_WRITES_VALUE = 'field_writes_value'
     FIELD_WRITES_LITERAL = 'field_writes_literal'
     CONSTRUCTOR_CALL_ARGS = 'constructor_call_args'
+    CONSTRUCTOR_CALL_ARGS_VALUE = 'constructor_call_args_value'
+    CONSTRUCTOR_CALL_ARGS_LITERAL = 'constructor_call_args_literal'
     MODULE_GLOBAL_READS = 'module_global_reads'
     MODULE_GLOBAL_WRITES = 'module_global_writes'
     CLASS_ATTRIBUTE_READS = 'class_attribute_reads'
@@ -50,7 +54,6 @@ class Action(StrEnum):
     WRAP_BOX = 'wrap_box'
     WRAP_RUNTIME_TYPE_THEN_BOX = 'wrap_runtime_type_then_box'
     UNWRAP_BOX = 'unwrap_box'
-    PRESERVE_ARGUMENT_MUTATIONS = 'preserve_argument_mutations'
     UNWRAP_CHECKED_RETURN_VALUE = 'unwrap_checked_return_value'
     WRAP_NONNULL_RUNTIME_TYPE = 'wrap_nonnull_runtime_type'
 
@@ -73,6 +76,8 @@ PRODUCER_PLACES: set[Place] = {
 
 CONSUMER_PLACES: set[Place] = {
     Place.ANNOTATED_VALUE,
+    Place.ANNOTATED_VALUE_VALUE,
+    Place.ANNOTATED_VALUE_LITERAL,
     Place.REASSIGN_RHS,
     Place.FIELD_REASSIGN_RHS_VALUE,
     Place.FIELD_REASSIGN_RHS_LITERAL,
@@ -87,6 +92,8 @@ CONSUMER_PLACES: set[Place] = {
     Place.FIELD_WRITES_VALUE,
     Place.FIELD_WRITES_LITERAL,
     Place.CONSTRUCTOR_CALL_ARGS,
+    Place.CONSTRUCTOR_CALL_ARGS_VALUE,
+    Place.CONSTRUCTOR_CALL_ARGS_LITERAL,
     Place.MODULE_GLOBAL_WRITES,
     Place.CLASS_ATTRIBUTE_WRITES,
     Place.INSTANCE_FIELD_WRITES_VALUE,
@@ -123,423 +130,1386 @@ def annihilates(producer_place: str | None, producer_action: str | None, consume
         return False
     if producer_place is None or consumer_place is None:
         return False
+    if producer_place == str(Place.LOCAL_READS) and consumer_place == str(Place.ATTRIBUTE_RECEIVERS):
+        return False
     return affinity_for_place(producer_place) == 'producer' and affinity_for_place(consumer_place) == 'consumer'
 
 
 # One big table. No clever shared policy aliases: when a square breaks, edit the
 # square bob is looking at.
 POLICY: PolicyTable = {
-    'function_parameter_annotation': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
-            Place.REASSIGN_RHS: ('wrap_box',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'python_user_object': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-        }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'method_self_parameter_annotation': {
-        'python_user_object': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'method_parameter_annotation': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR: ('wrap_runtime_type_then_box',),
-        }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'constructor_self_parameter_annotation': {
-        'python_user_object': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'constructor_parameter_annotation': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
-            Place.REASSIGN_RHS: ('wrap_box',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'function_return_annotation': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_box',),
-            Place.RETURN_LITERALS: (),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'optional': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'union': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'none_only': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'method_return_annotation': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_box',),
-            Place.RETURN_LITERALS: (),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'optional': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'union': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'none_only': {'dynamic_any': {
-            Place.RETURN_VALUES: ('wrap_box',),
-            Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
-        }},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'constructor_return_annotation': {
-        'none_only': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-}
-
-for context in [
-    'function_local_annotation_no_value', 'method_local_annotation_no_value', 'constructor_local_annotation_no_value',
-]:
-    POLICY[context] = {
-        'cinder_scalar': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.LOCAL_WRITES: ('wrap_box',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
-for context in [
-    'function_local_annotation_with_value', 'method_local_annotation_with_value', 'constructor_local_annotation_with_value',
-]:
-    POLICY[context] = {
-        'cinder_scalar': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.REASSIGN_RHS: ('wrap_runtime_type_then_box',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
-POLICY.update({
-    'module_global_annotation_no_value': {
-        'cinder_scalar': {'dynamic_any': {}},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
-    'module_global_annotation_with_value': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
-            Place.LOCAL_WRITES: ('wrap_box',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.MODULE_GLOBAL_READS: ('wrap_runtime_type',),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-            Place.CALL_RESULTS_FROM_RETURN: ('preserve_argument_mutations',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {
-            Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
-        }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    },
     'class_attribute_annotation_no_value': {
-        'cinder_scalar': {'dynamic_any': {}},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+    },
+    'class_attribute_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
     },
     'class_attribute_annotation_with_value': {
-        'cinder_scalar': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
-            Place.LOCAL_WRITES: ('wrap_box',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_WRITES: ('wrap_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
     },
-})
-
-for context in [
-    'init_instance_variable_annotation_no_value', 'non_init_instance_variable_annotation_no_value',
-]:
-    POLICY[context] = {
-        'cinder_scalar': {'dynamic_any': {
-            Place.INSTANCE_FIELD_WRITES_VALUE: ('wrap_box',),
-            Place.INSTANCE_FIELD_WRITES_LITERAL: (),
-            Place.INSTANCE_FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'python_user_object': {'dynamic_any': {}},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
-for context in [
-    'init_instance_variable_annotation_with_value', 'non_init_instance_variable_annotation_with_value',
-]:
-    POLICY[context] = {
-        'cinder_scalar': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
-            Place.FIELD_REASSIGN_RHS_VALUE: ('wrap_box',),
-            Place.FIELD_REASSIGN_RHS_LITERAL: (),
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {}},
-        'cinder_static_container': {'dynamic_any': {
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'python_user_object': {'dynamic_any': {
-            Place.FIELD_READS: ('wrap_runtime_type',),
-        }},
-        'optional': {'dynamic_any': {}},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
-# IntEnum is not normal object. It is object-shaped to typechecker but int-like
-# and identity-sensitive at runtime. Casts around IntEnum state changed
-# DeltaBlue's planner direction decisions, so detyping IntEnum is annotation-only
-# unless a future benchmark proves a specific boundary needs help.
-for _context, _by_source in POLICY.items():
-    if 'python_user_object' in _by_source:
-        _by_source.setdefault('int_enum', {'dynamic_any': {}})
-
-
-for context in [
-    'module_global_annotation_with_none',
-    'class_attribute_annotation_with_none',
-    'function_local_annotation_with_none',
-    'method_local_annotation_with_none',
-    'constructor_local_annotation_with_none',
-    'init_instance_variable_annotation_with_none',
-    'non_init_instance_variable_annotation_with_none',
-]:
-    POLICY[context] = {
-        'optional': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-        }},
-        'union': {'dynamic_any': {
-            Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-        }},
-        'python_user_object': {'dynamic_any': {}},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'cinder_scalar': {'dynamic_any': {}},
-        'cinder_checked_container': {'dynamic_any': {}},
-        'cinder_static_container': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
-
-POLICY['module_global_annotation_with_none']['python_user_object'] = {'dynamic_any': {
-    Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
-}}
-for _context in ['init_instance_variable_annotation_with_none', 'non_init_instance_variable_annotation_with_none']:
-    POLICY[_context]['python_user_object'] = {'dynamic_any': {
-        Place.FIELD_READS: ('wrap_runtime_type',),
-    }}
-
-
-for _context in ['function_parameter_annotation', 'method_parameter_annotation', 'constructor_parameter_annotation']:
-    if 'python_user_object' in POLICY.get(_context, {}):
-        POLICY[_context]['python_user_object']['dynamic_any'][Place.ATTRIBUTE_RECEIVERS] = ('wrap_nonnull_runtime_type',)
-for _context in ['init_instance_variable_annotation_with_none', 'non_init_instance_variable_annotation_with_none']:
-    POLICY[_context]['python_user_object']['dynamic_any'][Place.ATTRIBUTE_RECEIVERS] = ('wrap_nonnull_runtime_type',)
-
-
-for _context in [
-    'function_local_annotation_no_value', 'method_local_annotation_no_value', 'constructor_local_annotation_no_value',
-    'function_local_annotation_with_value', 'method_local_annotation_with_value', 'constructor_local_annotation_with_value',
-]:
-    if 'python_user_object' in POLICY.get(_context, {}):
-        POLICY[_context]['python_user_object']['dynamic_any'][Place.ATTRIBUTE_RECEIVERS] = ('wrap_nonnull_runtime_type',)
-
-
-for _context in ['function_parameter_annotation_with_optional', 'method_parameter_annotation_with_optional', 'constructor_parameter_annotation_with_optional']:
-    POLICY[_context] = {
-        'python_user_object': {'dynamic_any': {
-            Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
-        }},
-        'python_scalar': {'dynamic_any': {}},
-        'python_tuple': {'dynamic_any': {}},
-        'python_container': {'dynamic_any': {}},
-        'cinder_scalar': {'dynamic_any': {
-            Place.LOCAL_READS: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_box',),
-        }},
-        'cinder_checked_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-            Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
-            Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
-            Place.SUBSCRIPT_INDICES: ('wrap_box',),
-            Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
-        }},
-        'cinder_static_container': {'dynamic_any': {
-            Place.ANNOTATION_SITE: ('rewrite_param_binding',),
-        }},
-        'optional': {'dynamic_any': {
-            Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
-        }},
-        'union': {'dynamic_any': {}},
-        'iterator': {'dynamic_any': {}},
-        'dynamic_unknown': {'dynamic_any': {}},
-    }
-
+    'constructor_local_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.LOCAL_WRITES: ('wrap_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'constructor_local_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'constructor_local_annotation_with_value': {
+        'callable': {
+            'dynamic_any': {},
+        },
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'constructor_parameter_annotation': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.CONSTRUCTOR_CALL_ARGS_LITERAL: ('wrap_runtime_type',),
+                Place.CONSTRUCTOR_CALL_ARGS_VALUE: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: (),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.REASSIGN_RHS: ('wrap_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'constructor_parameter_annotation_with_optional': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'constructor_return_annotation': {
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'none_only': {
+            'dynamic_any': {},
+        },
+    },
+    'constructor_self_parameter_annotation': {
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+    },
+    'function_local_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.LOCAL_WRITES: ('wrap_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'function_local_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'function_local_annotation_with_value': {
+        'callable': {
+            'dynamic_any': {},
+        },
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'function_parameter_annotation': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.REASSIGN_RHS: ('wrap_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'function_parameter_annotation_with_optional': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'function_return_annotation': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: (),
+                Place.RETURN_VALUES: (),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.RETURN_LITERALS: (),
+                Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'none_only': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'init_instance_variable_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.INSTANCE_FIELD_READS: ('wrap_runtime_type',),
+                Place.INSTANCE_FIELD_WRITES_LITERAL: (),
+                Place.INSTANCE_FIELD_WRITES_VALUE: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'init_instance_variable_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'init_instance_variable_annotation_with_value': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: (),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.FIELD_READS: (),
+                Place.LOCAL_READS: (),
+                Place.SUBSCRIPT_INDICES: (),
+                Place.SUBSCRIPT_RESULTS: (),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+                Place.FIELD_REASSIGN_RHS_LITERAL: (),
+                Place.FIELD_REASSIGN_RHS_VALUE: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'method_local_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.LOCAL_WRITES: ('wrap_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'method_local_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'method_local_annotation_with_value': {
+        'callable': {
+            'dynamic_any': {},
+        },
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: (),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.FIELD_READS: (),
+                Place.LOCAL_READS: (),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.REASSIGN_RHS: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'method_parameter_annotation': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: (),
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+                Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'method_parameter_annotation_with_optional': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_LITERAL: (),
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type',),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_ARGS_TO_PARAMETER_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_READS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.ANNOTATION_SITE: ('rewrite_param_binding',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'method_return_annotation': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: (),
+                Place.RETURN_VALUES: (),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+                Place.RETURN_LITERALS: (),
+                Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'none_only': {
+            'dynamic_any': {
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+                Place.RETURN_VALUES: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {
+                Place.CALL_RESULTS_FROM_RETURN: ('wrap_runtime_type',),
+                Place.OVERRIDE_FAMILY_ANNOTATION_SITES: ('remove_annotation',),
+                Place.RETURN_VALUES: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'method_self_parameter_annotation': {
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+    },
+    'module_global_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'module_global_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'module_global_annotation_with_value': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.CALL_RESULTS_FROM_RETURN: (),
+                Place.SUBSCRIPT_INDICES: ('wrap_box',),
+                Place.SUBSCRIPT_RESULTS: ('wrap_runtime_type',),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.LOCAL_WRITES: ('wrap_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'non_init_instance_variable_annotation_no_value': {
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.INSTANCE_FIELD_READS: ('wrap_runtime_type',),
+                Place.INSTANCE_FIELD_WRITES_LITERAL: (),
+                Place.INSTANCE_FIELD_WRITES_VALUE: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {},
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+    'non_init_instance_variable_annotation_with_none': {
+        'cinder_checked_container': {
+            'dynamic_any': {},
+        },
+        'cinder_scalar': {
+            'dynamic_any': {},
+        },
+        'cinder_static_container': {
+            'dynamic_any': {},
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+        'python_container': {
+            'dynamic_any': {},
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.ATTRIBUTE_RECEIVERS: ('wrap_nonnull_runtime_type',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+            },
+        },
+    },
+    'non_init_instance_variable_annotation_with_value': {
+        'cinder_checked_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_LITERAL: ('wrap_runtime_type',),
+                Place.FIELD_READS: (),
+                Place.LOCAL_READS: (),
+                Place.SUBSCRIPT_INDICES: (),
+                Place.SUBSCRIPT_RESULTS: (),
+            },
+        },
+        'cinder_scalar': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type_then_box',),
+                Place.ANNOTATED_VALUE_LITERAL: (),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type_then_box',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+                Place.FIELD_REASSIGN_RHS_LITERAL: (),
+                Place.FIELD_REASSIGN_RHS_VALUE: ('wrap_runtime_type_then_box',),
+            },
+        },
+        'cinder_static_container': {
+            'dynamic_any': {
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'dynamic_unknown': {
+            'dynamic_any': {},
+        },
+        'int_enum': {
+            'dynamic_any': {},
+        },
+        'iterator': {
+            'dynamic_any': {},
+        },
+        'optional': {
+            'dynamic_any': {},
+        },
+        'python_container': {
+            'dynamic_any': {
+                Place.ANNOTATED_VALUE: ('wrap_runtime_type',),
+                Place.ANNOTATED_VALUE_VALUE: ('wrap_runtime_type',),
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'python_scalar': {
+            'dynamic_any': {},
+        },
+        'python_tuple': {
+            'dynamic_any': {},
+        },
+        'python_user_object': {
+            'dynamic_any': {
+                Place.FIELD_READS: ('wrap_runtime_type',),
+            },
+        },
+        'union': {
+            'dynamic_any': {},
+        },
+    },
+}
 
 def policy_for(context: str, source_kind: str, target_kind: str = 'dynamic_any') -> dict[Place, tuple[Action, ...]]:
     raw = POLICY.get(context, {}).get(source_kind, {}).get(target_kind, {})

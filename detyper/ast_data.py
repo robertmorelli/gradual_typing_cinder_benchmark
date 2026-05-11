@@ -397,6 +397,25 @@ def _expr_type_metadata(node: ast.AST, aliases: dict[str, str] | None = None, in
     }
 
 
+def _runtime_type_src(annotation_src: str | None, resolved_src: str | None, kind: str) -> str | None:
+    if annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
+        return annotation_src
+    return resolved_src or annotation_src
+
+
+def _nonnull_type_src(annotation_src: str | None, resolved_src: str | None) -> str | None:
+    for src in (annotation_src or '', resolved_src or ''):
+        if src.startswith('Final[') and src.endswith(']'):
+            return src[len('Final['):-1]
+        if src.startswith('Optional[') and src.endswith(']'):
+            return src[len('Optional['):-1]
+        if '|' in src:
+            parts = [part.strip() for part in src.split('|') if part.strip() not in {'None', 'NoneType'}]
+            if len(parts) == 1:
+                return parts[0]
+    return resolved_src or annotation_src
+
+
 def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, function_id: int | None, class_id: int | None = None, name: str | None = None, param_index: int | None = None, aliases: dict[str, str] | None = None, int_enums: set[str] | None = None) -> dict[str, Any]:
     annotation_src = _name_of_type(annotation)
     pyright_resolved = _clean_pyright_type(getattr(annotation, 'pyright_type', None))
@@ -419,6 +438,8 @@ def _annotation_record(node: ast.AST, *, kind: str, annotation: ast.expr, functi
         'annotation_id': annotation.detyping_id,
         'annotation_src': annotation_src,
         'resolved_type_src': resolved,
+        'runtime_type_src': _runtime_type_src(annotation_src, resolved, kind),
+        'nonnull_type_src': _nonnull_type_src(annotation_src, resolved),
         'resolved_by': 'pyright' if pyright_resolved else 'alias' if (aliases or {}).get(annotation_src or '') else 'source',
         **type_meta,
         'span': _span(node),
@@ -873,6 +894,13 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
     for ids in subscript_results_by_annotation.values():
         ids[:] = sorted(set(ids))
 
+    def _expr_shape(expr: ast.AST | None) -> str:
+        if isinstance(expr, ast.Constant) and expr.value is None:
+            return 'none_literal'
+        if isinstance(expr, (ast.Constant, ast.List, ast.ListComp, ast.Tuple, ast.Set, ast.Dict)):
+            return 'literal'
+        return 'value'
+
     call_arg_uses: dict[str, dict[str, Any]] = {}
     call_args_by_param_annotation: dict[str, list[int]] = {}
     literal_call_args_by_param_annotation: dict[str, list[int]] = {}
@@ -897,7 +925,6 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         rec = {
             'id': arg_id,
             'call_id': int(call_id),
-            'arg_index': arg_index,
             'relation': relation,
             'callee_param_annotation_id': param_annotation_id,
             'callee_param_context': param_rec.get('context'),
@@ -905,10 +932,11 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             'callee_param_type_src': param_rec.get('resolved_type_src'),
             **_expr_type_metadata(by_id[arg_id], aliases, int_enum_names),
             **_arg_binding_metadata(by_id[arg_id]),
+            'arg_shape': _expr_shape(by_id[arg_id]),
         }
         call_arg_uses[str(arg_id)] = rec
         call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
-        if isinstance(by_id[arg_id], (ast.Constant, ast.List, ast.ListComp, ast.Tuple, ast.Set, ast.Dict)):
+        if rec['arg_shape'] in {'literal', 'none_literal'}:
             literal_call_args_by_param_annotation.setdefault(str(param_annotation_id), []).append(arg_id)
 
     for call_id, use_rec in function_uses.items():
@@ -1070,13 +1098,38 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                     **_expr_type_metadata(call_node, aliases, int_enum_names),
                 }
 
-    def _place_record(place: Place, node_id: int, **payload: Any) -> dict[str, Any]:
+    def _annotated_value_place(expr: ast.AST) -> Place:
+        return Place.ANNOTATED_VALUE_LITERAL if _expr_shape(expr) == 'literal' and isinstance(expr, (ast.List, ast.ListComp)) else Place.ANNOTATED_VALUE
+
+    def _return_value_place(expr: ast.AST | None) -> Place:
+        return Place.RETURN_LITERALS if _expr_shape(expr) in {'literal', 'none_literal'} else Place.RETURN_VALUES
+
+    def _field_reassign_place(expr: ast.AST | None) -> Place:
+        return Place.FIELD_REASSIGN_RHS_LITERAL if _expr_shape(expr) in {'literal', 'none_literal'} else Place.FIELD_REASSIGN_RHS_VALUE
+
+    def _call_arg_place(*, relation: str | None, arg_shape: str, arg_kind: str) -> Place:
+        is_constructor = relation == 'call_arg_to_constructor_param'
+        if arg_shape in {'literal', 'none_literal'}:
+            return Place.CONSTRUCTOR_CALL_ARGS_LITERAL if is_constructor else Place.CALL_ARGS_TO_PARAMETER_LITERAL
+        if arg_kind == 'cinder_scalar':
+            return Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR
+        if arg_kind == 'python_user_object':
+            return Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT
+        return Place.CONSTRUCTOR_CALL_ARGS_VALUE if is_constructor else Place.CALL_ARGS_TO_PARAMETER_VALUE
+
+    def _place_record(place: Place, node_id: int, **facts: Any) -> dict[str, Any]:
+        """Return a Stage-1 place record for one candidate edit location.
+
+        node_id is always the AST node an intent may edit if policy selects this
+        place.  Places are edit locations, not parent/child relation records.
+        Additional fields are edit facts for that same node, such as runtime_type_src.
+        """
         return {
             'place': str(place),
             'node_id': int(node_id),
             'affinity': affinity_for_place(place),
             'slot_key': str(int(node_id)),
-            **payload,
+            **facts,
         }
 
     place_records_by_annotation: dict[str, list[dict[str, Any]]] = {}
@@ -1085,15 +1138,14 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
         records: list[dict[str, Any]] = [_place_record(Place.ANNOTATION_SITE, ann_id)]
         ann_node = by_id.get(ann_id)
         if isinstance(ann_node, ast.AnnAssign) and ann_node.value is not None:
-            records.append(_place_record(Place.ANNOTATED_VALUE, ann_node.value.detyping_id))
+            records.append(_place_record(_annotated_value_place(ann_node.value), ann_node.value.detyping_id, runtime_type_src=rec.get('runtime_type_src')))
 
         function_id = rec.get('function_id')
         if rec.get('context') in {'function_return_annotation', 'method_return_annotation'} and function_id is not None:
             for node_id in base.returns_by_function.get(str(function_id), []):
                 return_node = by_id[int(node_id)]
                 value = return_node.value if isinstance(return_node, ast.Return) else None
-                place = Place.RETURN_LITERALS if isinstance(value, ast.Constant) else Place.RETURN_VALUES
-                records.append(_place_record(place, int(node_id)))
+                records.append(_place_record(_return_value_place(value), int(node_id), runtime_type_src=rec.get('runtime_type_src')))
 
         read_place = Place.MODULE_GLOBAL_READS if rec.get('context', '').startswith('module_global_') else Place.LOCAL_READS
         for node_id in name_reads_by_annotation.get(str(ann_id), []):
@@ -1104,8 +1156,7 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
             node_id = int(node_id)
             use = field_reassign_rhs_uses.get(str(node_id), {})
             rhs = by_id.get(int(use.get('rhs_id'))) if use.get('rhs_id') is not None else by_id[node_id]
-            place = Place.FIELD_REASSIGN_RHS_LITERAL if isinstance(rhs, ast.Constant) else Place.FIELD_REASSIGN_RHS_VALUE
-            records.append(_place_record(place, node_id))
+            records.append(_place_record(_field_reassign_place(rhs), node_id, runtime_type_src=rec.get('runtime_type_src')))
         for node_id in field_reads_by_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.FIELD_READS, int(node_id)))
         for node_id in attribute_receivers_by_annotation.get(str(ann_id), []):
@@ -1120,22 +1171,23 @@ def _build_rich_indexes(tree: ast.AST, base: _IndexBuilder) -> dict[str, Any]:
                 is_slice=use.get('is_slice'),
                 container_type_src=use.get('container_type_src'),
                 element_type_src=use.get('element_type_src'),
+                runtime_type_src=use.get('container_type_src') if use.get('is_slice') else use.get('element_type_src'),
             ))
         for node_id in override_family_annotations_by_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.OVERRIDE_FAMILY_ANNOTATION_SITES, int(node_id)))
-        literal_arg_ids = {int(node_id) for node_id in literal_call_args_by_param_annotation.get(str(ann_id), [])}
-        scalar_arg_ids = {int(node_id) for node_id in call_args_by_param_annotation_and_arg_kind.get(str(ann_id), {}).get('cinder_scalar', [])}
-        object_arg_ids = {int(node_id) for node_id in call_args_by_param_annotation_and_arg_kind.get(str(ann_id), {}).get('python_user_object', [])}
         for node_id in call_args_by_param_annotation.get(str(ann_id), []):
             node_id = int(node_id)
-            if node_id in literal_arg_ids:
-                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_LITERAL, node_id))
-            elif node_id in scalar_arg_ids:
-                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_FROM_CINDER_SCALAR, node_id))
-            elif node_id in object_arg_ids:
-                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_FROM_PYTHON_OBJECT, node_id))
-            else:
-                records.append(_place_record(Place.CALL_ARGS_TO_PARAMETER_VALUE, node_id))
+            call_arg_use = call_arg_uses.get(str(node_id), {})
+            place = _call_arg_place(
+                relation=call_arg_use.get('relation'),
+                arg_shape=call_arg_use.get('arg_shape') or 'value',
+                arg_kind=call_arg_use.get('pyright_type_kind') or 'dynamic_unknown',
+            )
+            records.append(_place_record(
+                place,
+                node_id,
+                runtime_type_src=rec.get('runtime_type_src'),
+            ))
         for node_id in call_results_by_return_annotation.get(str(ann_id), []):
             records.append(_place_record(Place.CALL_RESULTS_FROM_RETURN, int(node_id)))
         place_records_by_annotation[str(ann_id)] = records

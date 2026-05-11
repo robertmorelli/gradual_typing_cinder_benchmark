@@ -37,9 +37,7 @@ def make_wrap_expr(expr: ast.expr, typ: ast.expr) -> ast.expr:
     if kind in ('cast', 'container'):
         return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
     if kind == 'checked_list':
-        if isinstance(expr, (ast.List, ast.ListComp)):
-            return ast.Call(func=typ, args=[expr], keywords=[])
-        return ast.Call(func=ast.Name(id='cast', ctx=ast.Load()), args=[typ, expr], keywords=[])
+        return ast.Call(func=typ, args=[expr], keywords=[])
     return expr
 
 
@@ -130,75 +128,6 @@ def _apply_rewrite_param_binding(intent: Intent, nodes: dict[int, AST]) -> None:
     node.body = prepend + node.body
 
 
-def _apply_preserve_argument_mutations(intent: Intent, nodes: dict[int, AST]) -> None:
-    node = nodes[intent.location_id]
-    assert isinstance(node, ast.Call)
-    context = nodes[intent.context_id]
-    assert isinstance(context, ast.Module)
-    mod_body = context.body
-
-    insert_idx = 0
-    for i, stmt in enumerate(mod_body):
-        if isinstance(stmt, (ast.Import, ast.ImportFrom)):
-            insert_idx = i + 1
-
-    existing: set[str] = {stmt.name for stmt in mod_body if isinstance(stmt, FunctionDef)}
-    callee_name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else 'unknown'
-    sorted_args = sorted(intent.args, key=lambda item: item.index if item.index is not None else -1)
-    n_args = len(node.args)
-    arg_suffix = '_'.join(f'arg{arg.index}' for arg in sorted_args)
-    base = f'_repro_{callee_name}_{arg_suffix}'
-    repro_name = base
-    suffix = 2
-    while repro_name in existing:
-        repro_name = f'{base}_{suffix}'
-        suffix += 1
-
-    wrapper_params = [ast.arg(arg='f')] + [ast.arg(arg=f'arg{i}') for i in range(n_args)]
-    body_stmts: list[ast.stmt] = []
-    for arg in sorted_args:
-        idx = arg.index
-        body_stmts.append(ast.Assign(targets=[ast.Name(id=f'_arg{idx}', ctx=ast.Store())], value=ast.Call(func=arg.typ, args=[ast.Name(id=f'arg{idx}', ctx=ast.Load())], keywords=[]), lineno=0, col_offset=0))
-
-    converted = {arg.index for arg in sorted_args}
-    call_args = [ast.Name(id=(f'_arg{i}' if i in converted else f'arg{i}'), ctx=ast.Load()) for i in range(n_args)]
-    body_stmts.append(ast.Assign(targets=[ast.Name(id='_out', ctx=ast.Store())], value=ast.Call(func=ast.Name(id='f', ctx=ast.Load()), args=call_args, keywords=[]), lineno=0, col_offset=0))
-
-    for arg in sorted_args:
-        idx = arg.index
-        # CheckedList[T](arg) may return arg itself when arg is already the
-        # right checked-list kind. Do not clear/extend in that case or we erase
-        # the very mutations we are trying to preserve.
-        body_stmts.append(ast.If(
-            test=ast.Compare(
-                left=ast.Name(id=f'_arg{idx}', ctx=ast.Load()),
-                ops=[ast.IsNot()],
-                comparators=[ast.Name(id=f'arg{idx}', ctx=ast.Load())],
-            ),
-            body=[
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='clear', ctx=ast.Load()), args=[], keywords=[])),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id=f'arg{idx}', ctx=ast.Load()), attr='extend', ctx=ast.Load()), args=[ast.Name(id=f'_arg{idx}', ctx=ast.Load())], keywords=[])),
-            ],
-            orelse=[],
-        ))
-    body_stmts.append(ast.Return(value=ast.Name(id='_out', ctx=ast.Load())))
-
-    wrapper = FunctionDef(
-        name=repro_name,
-        args=ast.arguments(posonlyargs=[], args=wrapper_params, vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]),
-        body=body_stmts,
-        decorator_list=[],
-        returns=None,
-        lineno=0,
-        col_offset=0,
-    )
-    ast.fix_missing_locations(wrapper)
-    mod_body.insert(insert_idx, wrapper)
-    callee_expr = node.func
-    original_args = list(node.args)
-    node.func = ast.Name(id=repro_name, ctx=ast.Load())
-    node.args = [callee_expr] + original_args
-
 
 def _apply_unwrap_checked_return_value(intent: Intent, nodes: dict[int, AST]) -> None:
     node = nodes[intent.location_id]
@@ -252,9 +181,6 @@ def apply_intent(intent: Intent, nodes: dict[int, AST]) -> None:
         return
     if intent.kind == 'rewrite_param_binding':
         _apply_rewrite_param_binding(intent, nodes)
-        return
-    if intent.kind == 'preserve_argument_mutations':
-        _apply_preserve_argument_mutations(intent, nodes)
         return
     if intent.kind == 'unwrap_checked_return_value':
         _apply_unwrap_checked_return_value(intent, nodes)

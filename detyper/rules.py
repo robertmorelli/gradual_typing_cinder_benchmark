@@ -20,7 +20,6 @@ CallBoundary = Literal['detyped_callee', 'typed_callee']
 EditName = Literal[
     'remove_annotation',
     'rewrite_param_binding',
-    'preserve_argument_mutations',
     'wrap_with_runtime_type',
     'box',
     'wrap_later_name_uses',
@@ -209,7 +208,7 @@ PARAM_POLICIES: dict[TypeKind, ParamPolicy] = {
     ),
     'checked_list': ParamPolicy(
         definition_edits=('rewrite_param_binding',),
-        detyped_callee_call_edits=('preserve_argument_mutations',),
+        detyped_callee_call_edits=('wrap_with_runtime_type',),
         typed_callee_call_edits=(),
     ),
     'container': ParamPolicy(

@@ -17,7 +17,6 @@ class Arg(NamedTuple):
 IntentKind = Literal[
     'remove_annotation',
     'rewrite_param_binding',
-    'preserve_argument_mutations',
     'unwrap_checked_return_value',
     'wrap',
     'unwrap_box',
@@ -30,7 +29,6 @@ NodeCollisionKey = tuple[int, int]
 INTENT_EXECUTION_ORDER: list[IntentKind] = [
     'remove_annotation',
     'rewrite_param_binding',
-    'preserve_argument_mutations',
     'unwrap_checked_return_value',
     'wrap',
     'unwrap_box',
@@ -116,10 +114,6 @@ def make_remove_annotation_intent(location: AST, context: AST, args: list[Arg], 
 
 def make_rewrite_param_binding_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
     return make_intent('rewrite_param_binding', location, context, args, func_name)
-
-
-def make_preserve_argument_mutations_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:
-    return make_intent('preserve_argument_mutations', location, context, args, func_name)
 
 
 def make_unwrap_checked_return_value_intent(location: AST, context: AST, args: list[Arg], func_name: str) -> Intent:

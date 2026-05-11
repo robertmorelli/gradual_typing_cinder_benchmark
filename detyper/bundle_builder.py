@@ -5,10 +5,13 @@ KEEP THIS FILE BORING.
 Threat model, per project owner: if semantic discovery logic appears in this
 file, an orphanage full of children gets it.  Do not endanger the children.
 
-Stage 1 owns discovery: which nodes are relevant, which place each node belongs
-in, which affinity/slot a place uses, and any per-place payload needed by an
-action.  This file must not rediscover AST relationships, classify uses, infer
-special cases, or decide that one index implies another.
+Stage 1 owns discovery: which candidate edit nodes are relevant, which place
+each edit node belongs in, which affinity/slot a place uses, and any per-place
+facts needed by an action.  A place record's node_id is always the node the
+resulting intent edits.  Places are edit locations, not parent/child relation
+records.  This file must not rediscover AST relationships, classify uses, infer
+special cases, retarget from a subject node to an edit node, or decide that one
+index implies another.
 
 Allowed here:
 - read annotation records and Stage-1 place_records_by_annotation;
@@ -26,7 +29,7 @@ import ast
 
 from .ast_data import AstData, ast_from_data
 from .kind_context_policy import Action, Place, is_smoothing_action, policy_for
-from .intent_types import Arg, intent_to_json, make_preserve_argument_mutations_intent, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent
+from .intent_types import Arg, intent_to_json, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent
 from .intent_unifiers import IntentSet
 
 
@@ -38,19 +41,6 @@ def _type_expr(src: str | None) -> ast.expr | None:
         return parsed.body if isinstance(parsed, ast.Expression) else None
     except SyntaxError:
         return None
-
-
-def _nonnull_type_expr(annotation_src: str | None, resolved_src: str | None) -> ast.expr | None:
-    for src in (annotation_src or '', resolved_src or ''):
-        if src.startswith('Final[') and src.endswith(']'):
-            return _type_expr(src[len('Final['):-1])
-        if src.startswith('Optional[') and src.endswith(']'):
-            return _type_expr(src[len('Optional['):-1])
-        if '|' in src:
-            parts = [part.strip() for part in src.split('|') if part.strip() not in {'None', 'NoneType'}]
-            if len(parts) == 1:
-                return _type_expr(parts[0])
-    return _type_expr(resolved_src) or _type_expr(annotation_src)
 
 
 def _wrap_args(action: Action, typ: ast.expr | None) -> list[Arg]:
@@ -75,37 +65,23 @@ def _func_name(context: ast.AST) -> str:
 
 
 def _annotation_type(rec: dict) -> ast.expr | None:
-    type_src = rec.get('resolved_type_src')
-    annotation_src = rec.get('annotation_src')
-    if annotation_src and ('|' in annotation_src or annotation_src.startswith(('Optional[', 'Union['))):
-        type_src = annotation_src
-    return _type_expr(type_src)
+    return _type_expr(rec.get('runtime_type_src') or rec.get('resolved_type_src') or rec.get('annotation_src'))
 
 
 def _action_type(action: Action, annotation_rec: dict, place_rec: dict, default_typ: ast.expr | None) -> ast.expr | None:
     if action == Action.WRAP_NONNULL_RUNTIME_TYPE:
-        return _nonnull_type_expr(annotation_rec.get('annotation_src'), annotation_rec.get('resolved_type_src'))
-    if Place(place_rec['place']) == Place.SUBSCRIPT_RESULTS:
-        if place_rec.get('is_slice'):
-            return _type_expr(place_rec.get('container_type_src')) or default_typ
-        return _type_expr(place_rec.get('element_type_src')) or default_typ
-    return default_typ
+        return _type_expr(annotation_rec.get('nonnull_type_src')) or default_typ
+    return _type_expr(place_rec.get('runtime_type_src')) or default_typ
 
 
-def _make_action_intent(action: Action, target: ast.AST, context: ast.AST, typ: ast.expr | None, rec: dict, place_rec: dict, tree: ast.AST):
+def _make_action_intent(action: Action, edit_node: ast.AST, context: ast.AST, typ: ast.expr | None, rec: dict, place_rec: dict):
     context_name = _func_name(context)
     if action == Action.REMOVE_ANNOTATION:
-        return make_remove_annotation_intent(target, context, [Arg(None, None)], context_name)
-    if action == Action.REWRITE_PARAM_BINDING and isinstance(target, ast.arg) and isinstance(context, ast.FunctionDef):
+        return make_remove_annotation_intent(edit_node, context, [Arg(None, None)], context_name)
+    if action == Action.REWRITE_PARAM_BINDING and isinstance(edit_node, ast.arg) and isinstance(context, ast.FunctionDef):
         return make_rewrite_param_binding_intent(context, context, [Arg(rec.get('param_index'), typ)], context_name)
-    if action == Action.PRESERVE_ARGUMENT_MUTATIONS:
-        call_id = place_rec.get('call_id')
-        arg_index = place_rec.get('arg_index')
-        if call_id is None or arg_index is None:
-            return None
-        return make_preserve_argument_mutations_intent(tree.detyping_node_index[int(call_id)], tree, [Arg(int(arg_index), typ)], '<module>')
     if wrap_args := _wrap_args(action, typ):
-        intent = make_wrap_intent(target, context, wrap_args, context_name)
+        intent = make_wrap_intent(edit_node, context, wrap_args, context_name)
         intent.affinity = place_rec.get('affinity')
         intent.policy_place = place_rec.get('place')
         intent.policy_action = str(action)
@@ -136,12 +112,12 @@ def build_detyper_map_from_ast_data(ast_data: AstData, annotation_ids: list[str]
 
         for place_rec in place_records_by_annotation.get(str(annotation_id), []):
             place = Place(place_rec['place'])
-            target = tree.detyping_node_index[int(place_rec['node_id'])]
-            context = _annotation_context(target, tree)
+            edit_node = tree.detyping_node_index[int(place_rec['node_id'])]
             for action in policy.get(place, ()):
                 action = Action(action)
+                context = _annotation_context(edit_node, tree)
                 action_typ = _action_type(action, rec, place_rec, typ)
-                intent = _make_action_intent(action, target, context, action_typ, rec, place_rec, tree)
+                intent = _make_action_intent(action, edit_node, context, action_typ, rec, place_rec)
                 if intent is not None:
                     detyper.add(intent)
 
