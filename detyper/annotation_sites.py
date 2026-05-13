@@ -94,10 +94,10 @@ def annotation_sites_from_tree(module: ast.Module, aliases: dict[str, ast.expr] 
                         span=_span(arg),
                     ))
 
-            if not is_dunder and fdef.returns is not None:
+            if (not is_dunder or fdef.name == '__init__') and fdef.returns is not None:
                 sites.append(AnnotationSite(
                     id=fdef.detyping_id,
-                    kind='return',
+                    kind='constructor_return' if fdef.name == '__init__' else 'return',
                     function_name=fdef.name,
                     typ=expand_aliases(resolve_annotation(fdef.returns), aliases),
                     span=_span(fdef),

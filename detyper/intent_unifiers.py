@@ -12,6 +12,30 @@ class IntentCollisionError(Exception):
     pass
 
 
+_WRAP_KINDS = {'wrap', 'wrap_then_box', 'wrap_constructor', 'wrap_cast'}
+
+
+def _typ_text(intent: Intent) -> str | None:
+    import ast as _ast
+    return _ast.unparse(intent.typ) if intent.typ is not None else None
+
+
+def _annihilate_producer_consumer(intents: list[Intent]) -> list[Intent]:
+    """When producer and consumer wraps target the same node with the same type, drop one (keep the consumer)."""
+    by_loc: dict[int, dict[str, Intent]] = {}
+    for intent in intents:
+        if intent.kind not in _WRAP_KINDS or intent.affinity not in ('producer', 'consumer'):
+            continue
+        slot = by_loc.setdefault(intent.location_id, {})
+        slot[intent.affinity] = intent
+    dropped: set[int] = set()
+    for loc, slots in by_loc.items():
+        if 'producer' in slots and 'consumer' in slots:
+            if _typ_text(slots['producer']) == _typ_text(slots['consumer']):
+                dropped.add(id(slots['producer']))
+    return [intent for intent in intents if id(intent) not in dropped]
+
+
 def _check_no_collisions(intents: list[Intent]) -> None:
     seen: dict[tuple[int, str, str | None], Intent] = {}
     for intent in intents:
@@ -46,7 +70,7 @@ class IntentSet:
 
     def _sorted(self) -> list[Intent]:
         _check_no_collisions(self._intents)
-        return sorted(self._intents, key=lambda intent: intent.sort_key)
+        return sorted(_annihilate_producer_consumer(self._intents), key=lambda intent: intent.sort_key)
 
     def execute(self, nodes: dict[int, AST]) -> None:
         for intent in self._sorted():
