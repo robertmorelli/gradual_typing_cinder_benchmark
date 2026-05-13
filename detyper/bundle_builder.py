@@ -6,7 +6,7 @@ import ast
 
 from .ast_data import AstData, ast_from_data
 from .kind_context_policy import Action, Place, affinity_for_place, policy_for
-from .intent_types import intent_to_json, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent, make_unwrap_box_intent, make_unwrap_checked_return_value_intent
+from .intent_types import intent_to_json, make_remove_annotation_intent, make_rewrite_param_binding_intent, make_wrap_intent, make_wrap_then_box_intent, make_wrap_constructor_intent, make_wrap_cast_intent, make_unwrap_box_intent, make_unwrap_checked_return_value_intent
 from .intent_unifiers import IntentSet
 
 
@@ -40,8 +40,11 @@ def _make_action_intent(action: Action, edit_node: ast.AST, typ: ast.expr | None
     if action == Action.WRAP_BOX:
         return make_wrap_intent(edit_node, typ=None, nonnull_typ=nonnull_typ, affinity=affinity)  # type: ignore[arg-type]
     if action == Action.WRAP_RUNTIME_TYPE_THEN_BOX:
-        # Minimal intent shape cannot represent ordered multi-step wraps anymore.
-        return make_wrap_intent(edit_node, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)  # type: ignore[arg-type]
+        return make_wrap_then_box_intent(edit_node, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)  # type: ignore[arg-type]
+    if action == Action.WRAP_CONSTRUCTOR:
+        return make_wrap_constructor_intent(edit_node, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)  # type: ignore[arg-type]
+    if action == Action.WRAP_CAST:
+        return make_wrap_cast_intent(edit_node, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)  # type: ignore[arg-type]
     if action == Action.UNWRAP_BOX:
         return make_unwrap_box_intent(edit_node)
     if action == Action.UNWRAP_CHECKED_RETURN_VALUE:

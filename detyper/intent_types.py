@@ -13,28 +13,16 @@ IntentKind = Literal[
     'rewrite_param_binding',
     'unwrap_checked_return_value',
     'wrap',
+    'wrap_then_box',
+    'wrap_constructor',
+    'wrap_cast',
     'unwrap_box',
 ]
 
 Affinity = Literal['producer', 'consumer']
 
-INTENT_EXECUTION_ORDER: list[IntentKind] = [
-    'remove_annotation',
-    'rewrite_param_binding',
-    'unwrap_checked_return_value',
-    'wrap',
-    'unwrap_box',
-]
-
-
 def node_id(node: AST) -> int:
     return getattr(node, 'detyping_id', id(node))
-
-
-def precedence_index(intent_kind: IntentKind) -> int:
-    if intent_kind in INTENT_EXECUTION_ORDER:
-        return INTENT_EXECUTION_ORDER.index(intent_kind)
-    return len(INTENT_EXECUTION_ORDER)
 
 
 @dataclass
@@ -49,8 +37,8 @@ class Intent:
         return self.location_id
 
     @property
-    def sort_key(self) -> tuple[int, int]:
-        return (self.location_id, precedence_index(self.kind))
+    def sort_key(self) -> tuple[int, str]:
+        return (self.location_id, self.affinity or '')
 
     def clone(self) -> 'Intent':
         return Intent(self.kind, self.location_id, self.affinity, self.typ, self.nonnull_typ)
@@ -74,6 +62,18 @@ def make_unwrap_checked_return_value_intent(location: AST) -> Intent:
 
 def make_wrap_intent(location: AST, typ: ast.expr | None = None, nonnull_typ: ast.expr | None = None, affinity: Affinity | None = None) -> Intent:
     return make_intent('wrap', location, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)
+
+
+def make_wrap_then_box_intent(location: AST, typ: ast.expr | None = None, nonnull_typ: ast.expr | None = None, affinity: Affinity | None = None) -> Intent:
+    return make_intent('wrap_then_box', location, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)
+
+
+def make_wrap_constructor_intent(location: AST, typ: ast.expr | None = None, nonnull_typ: ast.expr | None = None, affinity: Affinity | None = None) -> Intent:
+    return make_intent('wrap_constructor', location, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)
+
+
+def make_wrap_cast_intent(location: AST, typ: ast.expr | None = None, nonnull_typ: ast.expr | None = None, affinity: Affinity | None = None) -> Intent:
+    return make_intent('wrap_cast', location, typ=typ, nonnull_typ=nonnull_typ, affinity=affinity)
 
 
 def make_unwrap_box_intent(location: AST) -> Intent:
