@@ -76,7 +76,7 @@ SELECT
     a.annotation_id, p.node_id, n.start, n.end,
     pol.intent_kind  AS kind,
     aff.affinity     AS affinity,
-    a.typ_src        AS typ_src
+    NULLIF(a.typ_src, '') AS typ_src
 FROM annotations a
 JOIN places p   ON p.annotation_id = a.annotation_id
 JOIN nodes  n   ON n.node_id       = p.node_id
@@ -88,7 +88,7 @@ LEFT JOIN affinities aff ON aff.place = p.place
 UNION ALL
 -- Every annotation_site gets an unconditional remove_annotation.
 SELECT a.annotation_id, p.node_id, n.start, n.end,
-       'remove_annotation', NULL, a.typ_src
+       'remove_annotation', NULL, NULLIF(a.typ_src, '')
 FROM annotations a
 JOIN places p ON p.annotation_id = a.annotation_id AND p.place = 'annotation_site'
 JOIN nodes  n ON n.node_id = p.node_id;

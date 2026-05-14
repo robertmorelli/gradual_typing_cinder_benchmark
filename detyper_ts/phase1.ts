@@ -16,16 +16,17 @@ import { NullConsole } from '../vendor/pyright/packages/pyright-internal/src/com
 import { UriEx } from '../vendor/pyright/packages/pyright-internal/src/common/uri/uriUtils';
 import { createFromRealFileSystem, RealTempFile } from '../vendor/pyright/packages/pyright-internal/src/common/realFileSystem';
 import { getChildNodes } from '../vendor/pyright/packages/pyright-internal/src/analyzer/parseTreeWalker';
-import { ParseNodeType } from '../vendor/pyright/packages/pyright-internal/src/parser/parseNodes';
+import { ParamCategory, ParseNodeType } from '../vendor/pyright/packages/pyright-internal/src/parser/parseNodes';
 import type { ParseNode } from '../vendor/pyright/packages/pyright-internal/src/parser/parseNodes';
 import { getEnclosingClass, getEnclosingFunction } from '../vendor/pyright/packages/pyright-internal/src/analyzer/parseTreeUtils';
 import {
     TypeCategory,
+    isAnyOrUnknown,
+    isClass,
     isClassInstance,
-    type ClassType,
+    ClassType,
     type Type,
 } from '../vendor/pyright/packages/pyright-internal/src/analyzer/types';
-import { convertToInstance } from '../vendor/pyright/packages/pyright-internal/src/analyzer/typeUtils';
 
 // ---------------------------------------------------------------------------
 // 1. Setup
@@ -44,6 +45,7 @@ const realFs = createFromRealFileSystem(tempFile, new NullConsole());
 const serviceProvider = createServiceProvider(realFs, new NullConsole(), tempFile);
 const configOptions = new ConfigOptions(UriEx.file(path.dirname(sourcePath)));
 configOptions.stubPath = UriEx.file(path.resolve(__dirname, '..', 'detyper', 'stubs'));
+configOptions.typeshedPath = UriEx.file(path.resolve(__dirname, '..', 'vendor', 'pyright', 'packages', 'pyright-internal', 'typeshed-fallback'));
 const service = new AnalyzerService('phase1', serviceProvider, {
     console: new NullConsole(),
     hostFactory: () => new FullAccessHost(serviceProvider),
@@ -116,12 +118,27 @@ interface Annotation {
     declNode: ParseNode;          // pyright's symbol-declaration node for this annotation's subject
     funcNode?: ParseNode;
     paramIndex?: number;
+    syncKey?: string;
+    classType?: ClassType;
 }
 const annotations: Annotation[] = [];
 const annotationByDecl = new Map<ParseNode, Annotation>();
+const annotationNodes = new Set<ParseNode>();
 
 function pType(node: ParseNode): Type | undefined {
     try { return evaluator.getType(node as any); } catch { return undefined; }
+}
+
+function annotationType(node: ParseNode, opts: any = {}): Type | undefined {
+    try { return evaluator.getTypeOfAnnotation(node as any, opts); } catch { return undefined; }
+}
+
+function typeHasAnyUnknown(t: Type | undefined): boolean {
+    if (!t) return true;
+    if (isAnyOrUnknown(t)) return true;
+    if (t.category === TypeCategory.Union) return ((t as any).priv?.subtypes ?? []).some(typeHasAnyUnknown);
+    if (isClass(t)) return [...((t as any).priv?.typeArgs ?? []), ...((t as any).priv?.tupleTypeArgs ?? [])].some(typeHasAnyUnknown);
+    return false;
 }
 
 function emitPlace(annId: number, place: string, node: ParseNode) {
@@ -135,21 +152,30 @@ function recordAnnotation(args: {
     declNode: ParseNode;
     funcNode?: ParseNode;
     paramIndex?: number;
+    syncKey?: string;
+    classType?: ClassType;
 }): Annotation {
     const id = nextAnnId++;
-    // Annotation nodes evaluate to `type[X]`; convert to the instance type so
-    // type_kind/typ_src describe the value an annotated symbol holds at runtime.
-    const inst = args.typ ? convertToInstance(args.typ) : undefined;
+    const typSrc = typeHasAnyUnknown(args.typ) ? '' : evaluator.printType(args.typ!, { expandTypeAlias: false, omitTypeArgsIfUnknown: false });
     insertAnnotation.run(
         id,
         nodeIdByRef.get(args.anchor)!,
         args.context,
-        classifyType(inst),
-        inst ? evaluator.printType(inst, { expandTypeAlias: false }) : '',
+        classifyType(args.typ),
+        typSrc,
     );
-    const a: Annotation = { id, context: args.context, declNode: args.declNode, funcNode: args.funcNode, paramIndex: args.paramIndex };
+    const a: Annotation = {
+        id,
+        context: args.context,
+        declNode: args.declNode,
+        funcNode: args.funcNode,
+        paramIndex: args.paramIndex,
+        syncKey: args.syncKey,
+        classType: args.classType,
+    };
     annotations.push(a);
     annotationByDecl.set(args.declNode, a);
+    annotationNodes.add(args.anchor);
     emitPlace(id, 'annotation_site', args.anchor);
     return a;
 }
@@ -189,27 +215,38 @@ function walkAnnotations(node: ParseNode) {
             const f: any = node;
             const cls = getEnclosingClass(node);
             const prefix = functionContextPrefix(f, cls);
+            const clsType = cls ? evaluator.getTypeOfClass(cls as any)?.classType : undefined;
+            const classType = clsType && isClass(clsType) ? clsType : undefined;
+            const methodName = cls ? f.d.name?.d?.value : undefined;
             const params: any[] = f.d.params;
             const startIdx = prefix !== 'function' && params.length > 0 ? 1 : 0;
             for (let i = startIdx; i < params.length; i++) {
                 const p = params[i];
                 if (!p.d.annotation) continue;
-                const typ = pType(p.d.annotation);
+                const typ = annotationType(p.d.annotation, {
+                    typeVarGetsCurScope: true,
+                    allowUnpackedTuple: p.d.category === ParamCategory.ArgsList,
+                    allowUnpackedTypedDict: p.d.category === ParamCategory.KwargsDict,
+                });
                 let context = `${prefix}_parameter_annotation`;
                 if (isOptional(typ)) context += '_with_optional';
                 recordAnnotation({
                     anchor: p.d.annotation, context, typ,
                     declNode: p.d.name ?? p,
                     funcNode: node, paramIndex: i,
+                    syncKey: methodName && `${methodName}:param:${i}`,
+                    classType,
                 });
             }
             if (f.d.returnAnnotation) {
                 recordAnnotation({
                     anchor: f.d.returnAnnotation,
                     context: `${prefix}_return_annotation`,
-                    typ: pType(f.d.returnAnnotation),
+                    typ: annotationType(f.d.returnAnnotation),
                     declNode: node,
                     funcNode: node,
+                    syncKey: methodName && `${methodName}:return`,
+                    classType,
                 });
             }
             break;
@@ -232,7 +269,7 @@ function walkAnnotations(node: ParseNode) {
 function classifyAnnAssign(ta: any, rhs: ParseNode | undefined) {
     const target: any = ta.d.valueExpr;
     const annotation = ta.d.annotation;
-    const typ = pType(annotation);
+    const typ = annotationType(annotation, { varTypeAnnotation: true, allowClassVar: true });
     const funcNode = getEnclosingFunction(ta);
     const classNode = getEnclosingClass(ta);
     const funcPrefix = funcNode ? functionContextPrefix(funcNode as any, getEnclosingClass(funcNode)) : null;
@@ -298,13 +335,21 @@ function declsOf(nameNode: ParseNode): ParseNode[] {
 // Map pyright param-name decls (a Name inside a Parameter) back to the Parameter
 // node, since our annotation decls use the Parameter's NAME node.
 function canonicalize(node: ParseNode): ParseNode {
+    if (node.nodeType === ParseNodeType.Parameter) return (node as any).d.name ?? node;
+    if (node.nodeType === ParseNodeType.TypeAnnotation) return (node as any).d.valueExpr ?? node;
     if (node.nodeType === ParseNodeType.Name && node.parent?.nodeType === ParseNodeType.Parameter) {
         return (node.parent as any).d.name ?? node;
     }
     return node;
 }
 
+function inAnnotation(node: ParseNode): boolean {
+    for (let n: ParseNode | undefined = node; n; n = n.parent) if (annotationNodes.has(n)) return true;
+    return false;
+}
+
 function visitForPlaces(node: ParseNode) {
+    if (inAnnotation(node)) return;
     if (node.nodeType === ParseNodeType.Name) {
         for (const decl of declsOf(node)) {
             const ann = annotationByDecl.get(canonicalize(decl));
@@ -443,10 +488,30 @@ function placeReturn(ret: ParseNode) {
 visitForPlaces(parseResults.parserOutput.parseTree);
 
 // ---------------------------------------------------------------------------
-// 6. Sync groups (override family). Default: each annotation is its own group.
+// 6. Sync groups (override family): same method + same param/return slot across
+// an inheritance chain detype together.
 // ---------------------------------------------------------------------------
 const insertSync = db.prepare('INSERT INTO sync_groups(annotation_id, member_id) VALUES (?, ?)');
-for (const a of annotations) insertSync.run(a.id, a.id);
+
+const parentAnn = annotations.map((_, i) => i);
+function findAnn(i: number): number { return parentAnn[i] === i ? i : (parentAnn[i] = findAnn(parentAnn[i]!)); }
+function unionAnn(a: number, b: number) { parentAnn[findAnn(b)] = findAnn(a); }
+function inMro(a: ClassType, b: ClassType): boolean {
+    return a.shared.mro.some(t => isClass(t) && ClassType.isSameGenericClass(t, b));
+}
+function related(a: Annotation, b: Annotation): boolean {
+    return !!a.classType && !!b.classType && (inMro(a.classType, b.classType) || inMro(b.classType, a.classType));
+}
+
+for (let i = 0; i < annotations.length; i++) {
+    for (let j = i + 1; j < annotations.length; j++) {
+        const a = annotations[i]!, b = annotations[j]!;
+        if (a.syncKey && a.syncKey === b.syncKey && related(a, b)) unionAnn(a.id, b.id);
+    }
+}
+for (const a of annotations) {
+    for (const b of annotations) if (findAnn(a.id) === findAnn(b.id)) insertSync.run(a.id, b.id);
+}
 
 // ---------------------------------------------------------------------------
 // 7. Static policy seed

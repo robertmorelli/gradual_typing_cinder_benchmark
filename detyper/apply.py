@@ -139,6 +139,28 @@ def _apply(tree: ast.AST, node: ast.AST, kind: str, typ_src: str | None, parent:
         _Replacer(id(node), repl).visit(tree)
 
 
+def _ensure_static_imports(tree: ast.AST) -> None:
+    """Phase 4 emits box(...)/cast(...); make their runtime imports unconditional."""
+    if not isinstance(tree, ast.Module):
+        return
+    imp = ast.ImportFrom(
+        module='__static__',
+        names=[ast.alias(name='box'), ast.alias(name='cast')],
+        level=0,
+    )
+    insert_at = 0
+    body = tree.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        insert_at = 1
+    while insert_at < len(body):
+        stmt = body[insert_at]
+        if isinstance(stmt, ast.ImportFrom) and stmt.module == '__future__':
+            insert_at += 1
+            continue
+        break
+    body.insert(insert_at, imp)
+
+
 def detype(source: str, db_path: str, perm_bits: list[bool] | None = None) -> str:
     conn = sqlite3.connect(db_path)
     conn.execute('DELETE FROM perm_selected')
@@ -161,5 +183,6 @@ def detype(source: str, db_path: str, perm_bits: list[bool] | None = None) -> st
             _apply(tree, node, kind, typ_src, parent)
     conn.close()
 
+    _ensure_static_imports(tree)
     ast.fix_missing_locations(tree)
     return ast.unparse(tree)
