@@ -361,13 +361,29 @@ def _clean_pyright_type(raw: str | None) -> str | None:
         parts = [part.strip() for part in text.split('```') if part.strip()]
         if parts:
             text = parts[-1]
+    # Multi-line class signatures: "class Foo(\n    a: int,\n    ...\n)" -> "Foo"
+    if text.startswith('class '):
+        head = text.split('\n', 1)[0]
+        # "class Foo(" or "class Foo:" etc.
+        import re as _re
+        m = _re.match(r'class\s+([A-Za-z_][\w\.]*(?:\[[^\]]+\])?)', head)
+        if m:
+            return m.group(1)
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if not lines:
         return None
-    text = lines[-1]
-    for prefix in ('(variable)', '(parameter)', '(function)', '(method)', '(class)', 'type:'):
-        if text.startswith(prefix):
-            text = text[len(prefix):].strip()
+    # If the first line looks like a complete type, prefer it (avoids the
+    # "take last line of multi-line signature" bug).
+    first = lines[0]
+    for prefix in ('(variable)', '(parameter)', '(function)', '(method)', '(class)',
+                   '(attribute)', '(field)', '(property)', '(constant)',
+                   '(argument)', '(symbol)', '(import)', 'type:'):
+        if first.startswith(prefix):
+            first = first[len(prefix):].strip()
+            break
+    else:
+        first = lines[-1]
+    text = first
     if text.startswith('(type)') and '=' in text:
         text = text.split('=', 1)[1].strip()
     if ':' in text and not text.startswith(('list[', 'dict[', 'tuple[', 'Tuple[', 'Optional[', 'Union[')):

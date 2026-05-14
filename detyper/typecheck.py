@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from .analogous_types import analysis_source
+_STUB_ROOT = Path(__file__).resolve().parent / 'stubs'
 
 
 def _file_uri(path: Path) -> str:
@@ -91,13 +91,24 @@ class _PyrightLsp:
     def notify(self, method: str, params: dict[str, Any]) -> None:
         self._send({'jsonrpc': '2.0', 'method': method, 'params': params})
 
-    def initialize(self) -> None:
+    def initialize(self, stub_path: str | None = None) -> None:
+        init_options: dict[str, Any] = {}
+        settings: dict[str, Any] = {
+            'python': {'analysis': {}},
+        }
+        if stub_path is not None:
+            settings['python']['analysis']['stubPath'] = stub_path
+            init_options['stubPath'] = stub_path
         self.request('initialize', {
             'processId': None,
             'rootUri': self._root_uri,
+            'workspaceFolders': [{'uri': self._root_uri, 'name': 'root'}],
+            'initializationOptions': init_options,
             'capabilities': {},
         })
         self.notify('initialized', {})
+        # Push settings via workspace/didChangeConfiguration too — pyright honors both paths.
+        self.notify('workspace/didChangeConfiguration', {'settings': settings})
 
     def open_file(self, uri: str, text: str) -> None:
         self.notify('textDocument/didOpen', {
@@ -194,15 +205,23 @@ def decorate_ast_with_pyright(tree: ast.AST, source: str, filename: str = 'modul
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            pyright_source = analysis_source(source)
-            if len(pyright_source) != len(source) or pyright_source.count('\n') != source.count('\n'):
-                pyright_source = source
+            # Use the original source unmodified -- pyright resolves __static__
+            # symbols via the vendored stub configured in pyrightconfig.json below.
+            pyright_source = source
             path = Path(tmp) / filename
             path.write_text(pyright_source, encoding='utf-8')
+            # Point pyright at our vendored __static__ stub so CheckedList/int64/
+            # cast/etc. resolve to real types instead of being unknown.
+            (Path(tmp) / 'pyrightconfig.json').write_text(json.dumps({
+                'stubPath': str(_STUB_ROOT),
+                'useLibraryCodeForTypes': True,
+                'reportMissingImports': 'none',
+                'reportMissingTypeStubs': 'none',
+            }), encoding='utf-8')
             uri = _file_uri(path)
             lsp = _PyrightLsp(Path(tmp))
             try:
-                lsp.initialize()
+                lsp.initialize(stub_path=str(_STUB_ROOT))
                 lsp.open_file(uri, pyright_source)
                 type_map: dict[tuple[int, int], str] = {}
                 symbol_map: dict[tuple[int, int], dict[str, Any]] = {}

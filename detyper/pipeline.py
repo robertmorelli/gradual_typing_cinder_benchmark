@@ -432,6 +432,7 @@ def build_intent_table_from_detyper_map(detyper_map: dict, perm: Permutation) ->
         'perm_hex': perm_name(perm),
         'selected_annotation_ids': selected_ids,
         'intents': intents,
+        'node_types': detyper_map.get('node_types', {}),
     }
 
 
@@ -441,7 +442,9 @@ def build_detyped_program_from_intent_table(ast_data: AstData, intent_table: dic
     detyper = IntentSet()
     for intent_data in intent_table.get('intents', []):
         detyper.add(intent_from_json(intent_data))
-    detyper.execute(node_index(tree))
+    raw_node_types = intent_table.get('node_types', {})
+    node_types = {int(k): v for k, v in raw_node_types.items()}
+    detyper.execute(node_index(tree), node_types)
     _post_process(tree)
     _inject_static_imports(tree)
     ast.fix_missing_locations(tree)

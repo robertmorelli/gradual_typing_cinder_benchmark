@@ -4,3 +4,6 @@
 [submodule "static-python-perf"]
 	path = static-python-perf
 	url = https://github.com/utahplt/static-python-perf
+[submodule "vendor/pyright"]
+	path = vendor/pyright
+	url = https://github.com/microsoft/pyright.git
